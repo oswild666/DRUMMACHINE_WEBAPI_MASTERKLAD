@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DRUMBOSS</title>
+    <style>
+        /* Азербайджанская цветовая схема */
+        :root {
+            --blue: #009440;    /* Зеленый флаг Азербайджана */
+            --red: #ED2939;     /* Красный флаг Азербайджана */
+            --white: #FFFFFF;   /* Белый флаг Азербайджана */
+            --dark-blue: #00522A; /* Темно-зеленый */
+            --light-blue: #33A866; /* Светло-зеленый */
+            --gray: #C0C0C0;    /* Серый Windows 3.0 */
+            --dark-gray: #808080;
+            --darker-blue: #00682D; /* На 30% темнее зеленого */
+            --master-pattern: #8B0000; /* Темно-красный */
+            --master-pattern-active: #00CED1; /* Темно-бирюзовый */
+        }
+        
+        body {
+            font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+            background: var(--blue);
+            margin: 0;
+            padding: 20px;
+            color: #000;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Фон с горой Арарат */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                /* Ковчег Ноя */
+                linear-gradient(45deg, #8B4513 0%, #A0522D 100%) 70% 35%,
+                /* Горы */
+                linear-gradient(90deg, #556B2F 0%, #6B8E23 100%) 0% 80%,
+                linear-gradient(90deg, #2F4F4F 0%, #3CB371 100%) 20% 75%,
+                linear-gradient(90deg, #228B22 0%, #32CD32 100%) 40% 70%,
+                linear-gradient(90deg, #006400 0%, #008000 100%) 60% 65%,
+                /* Основная гора Арарат */
+                linear-gradient(90deg, #8B0000 0%, #A52A2A 100%) 50% 40%,
+                /* Снег на вершине */
+                linear-gradient(90deg, #FFFFFF 0%, #F0F8FF 100%) 50% 30%,
+                /* Небо */
+                linear-gradient(180deg, #87CEEB 0%, #E0F7FA 100%);
+            background-size: 
+                80px 40px, /* Ковчег */
+                200px 150px, /* Горы */
+                300px 200px,
+                400px 250px,
+                500px 300px,
+                600px 400px, /* Арарат */
+                600px 100px, /* Снег */
+                100% 100%; /* Небо */
+            background-repeat: no-repeat;
+            background-position: 
+                70% 35%, /* Ковчег */
+                0% 80%,
+                20% 75%,
+                40% 70%,
+                60% 65%,
+                50% 40%, /* Арарат */
+                50% 30%, /* Снег */
+                0% 0%; /* Небо */
+            z-index: -1;
+            opacity: 0.3;
+        }
+        
+        .window {
+            background: var(--gray);
+            border: 2px outset var(--gray);
+            box-shadow: 2px 2px 0 #000;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .title-bar {
+            background: var(--red);
+            color: var(--white);
+            padding: 3px 5px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .window-content {
+            padding: 10px;
+        }
+        
+        .button {
+            background: var(--gray);
+            border: 2px outset var(--gray);
+            padding: 3px 10px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            color: #000;
+        }
+        
+        .button:active {
+            border: 2px inset var(--gray);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 18px;
+            background: var(--gray);
+            border: 1px solid #000;
+            width: 100%;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--gray);
+            border: 1px solid #000;
+            cursor: pointer;
+        }
+        
+        .track {
+            margin-bottom: 15px;
+            border: 1px solid var(--dark-gray);
+            padding: 8px;
+            background: var(--light-blue);
+        }
+        
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--dark-gray);
+        }
+        
+        .track-name {
+            font-weight: bold;
+            color: var(--white);
+            text-shadow: 1px 1px 0 #000;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 2px;
+        }
+        
+        .step {
+            width: 20px;
+            height: 20px;
+            background: var(--gray);
+            border: 1px solid var(--dark-gray);
+            text-align: center;
+            line-height: 20px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        .step.active {
+            background: var(--red);
+        }
+        
+        .step.playing {
+            background: #FFFF00;
+        }
+        
+        .master-step {
+            background: var(--master-pattern);
+        }
+        
+        .master-step.active {
+            background: var(--master-pattern-active);
+        }
+        
+        .master-step.playing {
+            background: #FFFF00;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .control-label {
+            display: inline-block;
+            width: 120px;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        select {
+            background: var(--gray);
+            border: 1px solid #000;
+            font-family: inherit;
+            font-size: 14px;
+            padding: 2px;
+        }
+        
+        .status-bar {
+            background: var(--gray);
+            border: 2px inset var(--gray);
+            padding: 3px 5px;
+            font-size: 12px;
+            text-align: right;
+            color: #000;
+        }
+        
+        .pattern-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+            align-items: center;
+        }
+        
+        .pattern-controls label {
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .pattern-length {
+            width: 60px;
+            background: var(--gray);
+            border: 1px solid #000;
+            padding: 2px;
+        }
+        
+        .instrument-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .control-panel {
+            border: 1px solid var(--dark-gray);
+            padding: 8px;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.85);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-panel::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
+            opacity: 0.4;
+        }
+        
+        .control-panel-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .control-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .control-row label {
+            width: 160px;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .control-row input[type="range"] {
+            flex: 1;
+        }
+        
+        .control-row input[type="number"] {
+            width: 60px;
+            background: var(--gray);
+            border: 1px solid #000;
+            padding: 2px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: var(--white);
+            text-shadow: 2px 2px 0 #000;
+            margin-top: 0;
+            position: relative;
+            z-index: 1;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 10px;
+            border-radius: 5px;
+            display: inline-block;
+            margin: 0 auto 20px;
+        }
+        
+        .app-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .param-display {
+            font-size: 12px;
+            color: #000;
+            margin-left: 10px;
+            min-width: 40px;
+            display: inline-block;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .ring-mod-section {
+            border-top: 1px solid var(--dark-gray);
+            margin-top: 8px;
+            padding-top: 8px;
+        }
+        
+        .ring-mod-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #8B0000;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        .bpf-section {
+            border-top: 1px solid var(--dark-gray);
+            margin-top: 8px;
+            padding-top: 8px;
+        }
+        
+        .bpf-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #00008B;
+            background: rgba(0, 82, 42, 0.3); /* 30% темнее зеленого */
+            padding: 2px 5px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        .loop-type {
+            background: var(--gray);
+            border: 1px solid #000;
+            padding: 2px;
+        }
+        
+        .master-pattern-section {
+            background: var(--light-blue);
+            border: 1px solid var(--dark-gray);
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .master-pattern-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .master-pattern-header label {
+            background: rgba(0, 82, 42, 0.3);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .master-pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 2px;
+            max-width: 500px;
+        }
+        
+        .master-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: center;
+        }
+        
+        .master-controls label {
+            background: rgba(0, 82, 42, 0.3);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <h1>DRUMBOSS: SUNNY AZERBAIJAN RIDDIM</h1>
+        
+        <div class="window">
+            <div class="title-bar">
+                <span>Главное управление</span>
+            </div>
+            <div class="window-content">
+                <div class="button-group">
+                    <button id="playBtn" class="button">▶ Пуск</button>
+                    <button id="stopBtn" class="button">■ Стоп</button>
+                    <button id="restartBtn" class="button">↺ Перезапуск</button>
+                </div>
+                
+                <div class="control-group">
+                    <label class="control-label">Темп (BPM):</label>
+                    <input type="range" id="bpmSlider" min="40" max="240" value="120">
+                    <span id="bpmValue" class="param-display">120</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="master-pattern-section">
+            <div class="master-pattern-header">
+                <input type="checkbox" id="masterEnabled" checked>
+                <label for="masterEnabled">Мастер-паттерн (Start Track)</label>
+            </div>
+            <div class="master-pattern-grid" id="masterPattern">
+                <!-- Шаги мастер-паттерна будут добавлены динамически -->
+            </div>
+            <div class="master-controls">
+                <label>Длина:</label>
+                <input type="number" id="masterLength" class="pattern-length" min="1" max="32" value="16">
+                <select id="masterLoopType">
+                    <option value="normal">Обычный</option>
+                    <option value="pingpong">Пинг-понг</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="window">
+            <div class="title-bar">
+                <span>Инструменты</span>
+            </div>
+            <div class="window-content" id="tracksContainer">
+                <!-- Треки будут добавлены динамически -->
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <span>DRUMBOSS v1.0 | Полиритмический трекер | Горы Арарата</span>
+        </div>
+    </div>
+
+    <script>
+        // Аудио контекст
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Глобальные переменные
+        let isPlaying = false;
+        let bpm = 120;
+        let schedulerTimer;
+        let nextStepTime = 0;
+        let tracks = [];
+        let currentSteps = Array(6).fill(0);
+        
+        // Мастер-паттерн
+        let masterPattern = {
+            enabled: true,
+            pattern: Array(16).fill(0),
+            length: 16,
+            loopType: 'normal',
+            step: 0,
+            direction: 1
+        };
+        
+        // Настройки инструментов
+        const instrumentSettings = [
+            { name: "Kick 1", color: "#FF6B6B", type: "kick" },
+            { name: "Kick 2", color: "#4ECDC4", type: "kick" },
+            { name: "Snare", color: "#45B7D1", type: "snare" },
+            { name: "Hi-Hat", color: "#FFBE0B", type: "hihat" },
+            { name: "Tom", color: "#FB5607", type: "tom" },
+            { name: "Bell", color: "#8338EC", type: "bell" }
+        ];
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMasterPattern();
+            initializeTracks();
+            setupEventListeners();
+            generatePersianPatterns();
+        });
+        
+        // Инициализация мастер-паттерна
+        function initializeMasterPattern() {
+            const container = document.getElementById('masterPattern');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 32; i++) {
+                const stepEl = document.createElement('div');
+                stepEl.className = 'step master-step';
+                stepEl.dataset.step = i;
+                stepEl.textContent = i + 1;
+                stepEl.addEventListener('click', () => toggleMasterStep(i));
+                container.appendChild(stepEl);
+            }
+            
+            updateMasterPatternDisplay();
+        }
+        
+        // Переключение шага мастер-паттерна
+        function toggleMasterStep(step) {
+            masterPattern.pattern[step] = masterPattern.pattern[step] ? 0 : 1;
+            updateMasterStepDisplay(step);
+        }
+        
+        // Обновление отображения шага мастер-паттерна
+        function updateMasterStepDisplay(step) {
+            const stepEl = document.querySelector(`.master-step[data-step="${step}"]`);
+            if (masterPattern.pattern[step]) {
+                stepEl.classList.add('active');
+            } else {
+                stepEl.classList.remove('active');
+            }
+        }
+        
+        // Обновление отображения мастер-паттерна
+        function updateMasterPatternDisplay() {
+            const container = document.getElementById('masterPattern');
+            
+            // Скрыть/показать шаги в зависимости от длины
+            for (let i = 0; i < 32; i++) {
+                const stepEl = container.children[i];
+                if (i < masterPattern.length) {
+                    stepEl.style.display = 'block';
+                } else {
+                    stepEl.style.display = 'none';
+                }
+            }
+        }
+        
+        // Обновление отображения воспроизведения мастер-паттерна
+        function updateMasterPlaybackDisplay() {
+            // Сброс всех_playing классов
+            document.querySelectorAll('.master-step').forEach(step => {
+                step.classList.remove('playing');
+            });
+            
+            // Добавление_playing класса для текущего шага
+            const stepEl = document.querySelector(`.master-step[data-step="${masterPattern.step}"]`);
+            if (stepEl) {
+                stepEl.classList.add('playing');
+            }
+        }
+        
+        // Создание треков
+        function initializeTracks() {
+            const container = document.getElementById('tracksContainer');
+            
+            for (let i = 0; i < 6; i++) {
+                const track = createTrack(i, instrumentSettings[i]);
+                container.appendChild(track);
+                tracks.push({
+                    id: i,
+                    pattern: Array(16).fill(0),
+                    length: 16,
+                    loopType: 'normal', // 'normal' или 'pingpong'
+                    step: 0,
+                    direction: 1, // для pingpong
+                    settings: instrumentSettings[i],
+                    params: {
+                        volume: 0.8,
+                        startPitch: 100,
+                        endPitch: 50,
+                        duration: 100,
+                        fm: 0,
+                        ringMod: false,
+                        ringModFreq: 200,
+                        ringModDepth: 50,
+                        bpfEnabled: false,
+                        bpfFrequency: 1000,
+                        bpfQ: 1.0,
+                        filter: 5000
+                    }
+                });
+            }
+        }
+        
+        // Создание элемента трека
+        function createTrack(id, settings) {
+            const trackEl = document.createElement('div');
+            trackEl.className = 'track';
+            trackEl.innerHTML = `
+                <div class="track-header">
+                    <span class="track-name">${settings.name}</span>
+                    <div class="pattern-controls">
+                        <label>Длина:</label>
+                        <input type="number" class="pattern-length" min="1" max="32" value="16" data-track="${id}">
+                        <select class="loop-type" data-track="${id}">
+                            <option value="normal">Обычный</option>
+                            <option value="pingpong">Пинг-понг</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pattern-grid" id="pattern-${id}">
+                    ${Array(32).fill().map((_, i) => 
+                        `<div class="step" data-track="${id}" data-step="${i}">${i+1}</div>`
+                    ).join('')}
+                </div>
+                <div class="instrument-controls">
+                    <div class="control-panel" id="panel-left-${id}">
+                        <div class="control-panel-content">
+                            <div class="control-row">
+                                <label>Громкость:</label>
+                                <input type="range" min="0" max="100" value="80" data-param="volume" data-track="${id}">
+                                <span class="param-display" id="display-volume-${id}">80%</span>
+                            </div>
+                            <div class="control-row">
+                                <label>Начальный питч:</label>
+                                <input type="range" min="20" max="500" value="100" data-param="startPitch" data-track="${id}">
+                                <span class="param-display" id="display-startPitch-${id}">100</span>
+                            </div>
+                            <div class="control-row">
+                                <label>Конечный питч:</label>
+                                <input type="range" min="10" max="300" value="50" data-param="endPitch" data-track="${id}">
+                                <span class="param-display" id="display-endPitch-${id}">50</span>
+                            </div>
+                            <div class="control-row">
+                                <label>Длительность:</label>
+                                <input type="range" min="10" max="500" value="100" data-param="duration" data-track="${id}">
+                                <span class="param-display" id="display-duration-${id}">100ms</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-panel" id="panel-right-${id}">
+                        <div class="control-panel-content">
+                            <div class="control-row">
+                                <label>FM Модуляция:</label>
+                                <input type="range" min="0" max="100" value="0" data-param="fm" data-track="${id}">
+                                <span class="param-display" id="display-fm-${id}">0%</span>
+                            </div>
+                            <div class="control-row">
+                                <label>Фильтр:</label>
+                                <input type="range" min="200" max="10000" value="5000" data-param="filter" data-track="${id}">
+                                <span class="param-display" id="display-filter-${id}">5000Hz</span>
+                            </div>
+                            <div class="ring-mod-section">
+                                <div class="ring-mod-header">Кольцевая модуляция</div>
+                                <div class="control-row">
+                                    <label>Включить:</label>
+                                    <input type="checkbox" data-param="ringMod" data-track="${id}">
+                                </div>
+                                <div class="control-row">
+                                    <label>Частота модуляции:</label>
+                                    <input type="range" min="50" max="1000" value="200" data-param="ringModFreq" data-track="${id}">
+                                    <span class="param-display" id="display-ringModFreq-${id}">200Hz</span>
+                                </div>
+                                <div class="control-row">
+                                    <label>Глубина модуляции:</label>
+                                    <input type="range" min="0" max="100" value="50" data-param="ringModDepth" data-track="${id}">
+                                    <span class="param-display" id="display-ringModDepth-${id}">50%</span>
+                                </div>
+                            </div>
+                            <div class="bpf-section">
+                                <div class="bpf-header">BPF Фильтр</div>
+                                <div class="control-row">
+                                    <label>Включить:</label>
+                                    <input type="checkbox" data-param="bpfEnabled" data-track="${id}">
+                                </div>
+                                <div class="control-row">
+                                    <label>Частота:</label>
+                                    <input type="range" min="100" max="5000" value="1000" data-param="bpfFrequency" data-track="${id}">
+                                    <span class="param-display" id="display-bpfFrequency-${id}">1000Hz</span>
+                                </div>
+                                <div class="control-row">
+                                    <label>Q (резонанс):</label>
+                                    <input type="range" min="0.1" max="10" step="0.1" value="1.0" data-param="bpfQ" data-track="${id}">
+                                    <span class="param-display" id="display-bpfQ-${id}">1.0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return trackEl;
+        }
+        
+        // Генерация узоров персидского ковра с более контрастными цветами
+        function generatePersianPatterns() {
+            const panels = document.querySelectorAll('.control-panel');
+            panels.forEach((panel, index) => {
+                // Удаляем предыдущий canvas если есть
+                const existingCanvas = panel.querySelector('canvas');
+                if (existingCanvas) {
+                    existingCanvas.remove();
+                }
+                
+                const canvas = document.createElement('canvas');
+                const width = panel.offsetWidth;
+                const height = panel.offsetHeight;
+                canvas.width = width;
+                canvas.height = height;
+                canvas.style.position = 'absolute';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                canvas.style.zIndex = '0';
+                canvas.style.opacity = '0.4';
+                
+                const ctx = canvas.getContext('2d');
+                
+                // Фон
+                ctx.fillStyle = '#000000'; // Черный фон для контраста
+                ctx.fillRect(0, 0, width, height);
+                
+                // Генерация контрастного узора
+                drawContrastPersianPattern(ctx, width, height, index);
+                
+                panel.appendChild(canvas);
+            });
+        }
+        
+        // Рисование контрастного персидского узора
+        function drawContrastPersianPattern(ctx, width, height, index) {
+            const colors = [
+                '#FF0000', // Ярко-красный
+                '#800080', // Фиолетовый
+                '#0000FF', // Синий
+                '#FFFF00', // Желтый
+                '#00FF00', // Зеленый
+                '#FF00FF'  // Пурпурный
+            ];
+            
+            // Основная сетка
+            const gridSize = 15 + (index % 3) * 5;
+            for (let x = 0; x < width; x += gridSize) {
+                for (let y = 0; y < height; y += gridSize) {
+                    // Центральный элемент
+                    ctx.fillStyle = colors[(index + Math.floor(x/30) + Math.floor(y/30)) % colors.length];
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize/2, y + gridSize/2, gridSize/3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Угловые элементы
+                    ctx.fillStyle = colors[(index + 1 + Math.floor(x/20) + Math.floor(y/20)) % colors.length];
+                    ctx.beginPath();
+                    ctx.arc(x, y, gridSize/6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize, y, gridSize/6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y + gridSize, gridSize/6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize, y + gridSize, gridSize/6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Декоративные линии
+            ctx.strokeStyle = colors[(index + 2) % colors.length];
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 4; i++) {
+                const y = height * (i + 1) / 5;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            
+            for (let i = 0; i < 4; i++) {
+                const x = width * (i + 1) / 5;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            
+            // Центральный орнамент
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const size = Math.min(width, height) / 5;
+            
+            ctx.fillStyle = colors[(index + 3) % colors.length];
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY - size);
+            for (let i = 1; i <= 8; i++) {
+                const angle = (i * Math.PI / 4);
+                const x = centerX + size * Math.sin(angle);
+                const y = centerY - size * Math.cos(angle);
+                ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Внутренний круг
+            ctx.fillStyle = colors[(index + 4) % colors.length];
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, size/3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Узор из ромбов
+            const diamondSize = 20;
+            for (let x = diamondSize; x < width - diamondSize; x += diamondSize * 2) {
+                for (let y = diamondSize; y < height - diamondSize; y += diamondSize * 2) {
+                    ctx.fillStyle = colors[(index + x/50 + y/50) % colors.length];
+                    ctx.beginPath();
+                    ctx.moveTo(x, y - diamondSize/2);
+                    ctx.lineTo(x + diamondSize/2, y);
+                    ctx.lineTo(x, y + diamondSize/2);
+                    ctx.lineTo(x - diamondSize/2, y);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+        }
+        
+        // Настройка обработчиков событий
+        function setupEventListeners() {
+            // Кнопки управления
+            document.getElementById('playBtn').addEventListener('click', togglePlay);
+            document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+            document.getElementById('restartBtn').addEventListener('click', restartPlayback);
+            
+            // Слайдер BPM
+            const bpmSlider = document.getElementById('bpmSlider');
+            const bpmValue = document.getElementById('bpmValue');
+            bpmSlider.addEventListener('input', () => {
+                bpm = parseInt(bpmSlider.value);
+                bpmValue.textContent = bpm;
+            });
+            
+            // Мастер-паттерн
+            document.getElementById('masterEnabled').addEventListener('change', (e) => {
+                masterPattern.enabled = e.target.checked;
+            });
+            
+            document.getElementById('masterLength').addEventListener('change', (e) => {
+                const length = Math.min(32, Math.max(1, parseInt(e.target.value)));
+                e.target.value = length;
+                masterPattern.length = length;
+                updateMasterPatternDisplay();
+            });
+            
+            document.getElementById('masterLoopType').addEventListener('change', (e) => {
+                masterPattern.loopType = e.target.value;
+            });
+            
+            // Обработчики для треков
+            document.getElementById('tracksContainer').addEventListener('click', (e) => {
+                // Переключение шагов
+                if (e.target.classList.contains('step')) {
+                    const trackId = parseInt(e.target.dataset.track);
+                    const step = parseInt(e.target.dataset.step);
+                    toggleStep(trackId, step);
+                }
+            });
+            
+            // Изменение длины паттерна
+            document.querySelectorAll('.pattern-length').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const trackId = parseInt(e.target.dataset.track);
+                    const length = Math.min(32, Math.max(1, parseInt(e.target.value)));
+                    e.target.value = length;
+                    tracks[trackId].length = length;
+                    updatePatternDisplay(trackId);
+                });
+            });
+            
+            // Изменение типа зацикливания
+            document.querySelectorAll('.loop-type').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const trackId = parseInt(e.target.dataset.track);
+                    tracks[trackId].loopType = e.target.value;
+                });
+            });
+            
+            // Параметры инструментов
+            document.querySelectorAll('input[data-param]').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const trackId = parseInt(e.target.dataset.track);
+                    const param = e.target.dataset.param;
+                    let value;
+                    
+                    if (e.target.type === 'checkbox') {
+                        value = e.target.checked;
+                    } else if (e.target.type === 'range' && e.target.step === '0.1') {
+                        value = parseFloat(e.target.value);
+                    } else {
+                        value = parseInt(e.target.value);
+                    }
+                    
+                    tracks[trackId].params[param] = value;
+                    
+                    // Обновление отображения значения
+                    const display = document.getElementById(`display-${param}-${trackId}`);
+                    if (display) {
+                        switch(param) {
+                            case 'volume':
+                                display.textContent = `${value}%`;
+                                break;
+                            case 'duration':
+                                display.textContent = `${value}ms`;
+                                break;
+                            case 'filter':
+                                display.textContent = `${value}Hz`;
+                                break;
+                            case 'ringModFreq':
+                                display.textContent = `${value}Hz`;
+                                break;
+                            case 'ringModDepth':
+                                display.textContent = `${value}%`;
+                                break;
+                            case 'bpfFrequency':
+                                display.textContent = `${value}Hz`;
+                                break;
+                            case 'bpfQ':
+                                display.textContent = value.toFixed(1);
+                                break;
+                            default:
+                                display.textContent = value;
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Переключение шага
+        function toggleStep(trackId, step) {
+            const track = tracks[trackId];
+            track.pattern[step] = track.pattern[step] ? 0 : 1;
+            updateStepDisplay(trackId, step);
+        }
+        
+        // Обновление отображения шага
+        function updateStepDisplay(trackId, step) {
+            const stepEl = document.querySelector(`.step[data-track="${trackId}"][data-step="${step}"]`);
+            if (tracks[trackId].pattern[step]) {
+                stepEl.classList.add('active');
+            } else {
+                stepEl.classList.remove('active');
+            }
+        }
+        
+        // Обновление отображения паттерна
+        function updatePatternDisplay(trackId) {
+            const track = tracks[trackId];
+            const patternGrid = document.getElementById(`pattern-${trackId}`);
+            
+            // Скрыть/показать шаги в зависимости от длины
+            for (let i = 0; i < 32; i++) {
+                const stepEl = patternGrid.children[i];
+                if (i < track.length) {
+                    stepEl.style.display = 'block';
+                } else {
+                    stepEl.style.display = 'none';
+                }
+            }
+        }
+        
+        // Обновление отображения воспроизведения
+        function updatePlaybackDisplay() {
+            // Сброс всех_playing классов
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('playing');
+            });
+            
+            // Добавление_playing класса для текущих шагов
+            tracks.forEach((track, trackId) => {
+                const stepEl = document.querySelector(`.step[data-track="${trackId}"][data-step="${track.step}"]`);
+                if (stepEl) {
+                    stepEl.classList.add('playing');
+                }
+            });
+        }
+        
+        // Переключение воспроизведения
+        function togglePlay() {
+            if (isPlaying) {
+                stopPlayback();
+            } else {
+                startPlayback();
+            }
+        }
+        
+        // Запуск воспроизведения
+        function startPlayback() {
+            if (isPlaying) return;
+            
+            isPlaying = true;
+            document.getElementById('playBtn').textContent = '⏸ Пауза';
+            
+            // Сброс шагов
+            resetAllSteps();
+            
+            // Запуск планировщика
+            nextStepTime = audioContext.currentTime;
+            scheduler();
+        }
+        
+        // Сброс всех шагов
+        function resetAllSteps() {
+            // Сброс мастер-паттерна
+            masterPattern.step = 0;
+            masterPattern.direction = 1;
+            
+            // Сброс всех треков
+            tracks.forEach(track => {
+                track.step = 0;
+                track.direction = 1;
+            });
+        }
+        
+        // Остановка воспроизведения
+        function stopPlayback() {
+            isPlaying = false;
+            document.getElementById('playBtn').textContent = '▶ Пуск';
+            
+            if (schedulerTimer) {
+                clearTimeout(schedulerTimer);
+            }
+            
+            // Сброс отображения
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('playing');
+            });
+            
+            document.querySelectorAll('.master-step').forEach(step => {
+                step.classList.remove('playing');
+            });
+        }
+        
+        // Перезапуск воспроизведения
+        function restartPlayback() {
+            stopPlayback();
+            startPlayback();
+        }
+        
+        // Планировщик событий
+        function scheduler() {
+            if (!isPlaying) return;
+            
+            const lookahead = 0.1; // 100ms
+            const scheduleAheadTime = 0.1; // 100ms
+            
+            while (nextStepTime < audioContext.currentTime + scheduleAheadTime) {
+                // Вычисление времени следующего шага
+                const stepDuration = 60.0 / bpm / 4; // 16-я нота
+                
+                // Проигрывание звуков для текущих шагов
+                playStep(nextStepTime);
+                
+                // Обновление шагов
+                updateSteps();
+                
+                // Переход к следующему шагу
+                nextStepTime += stepDuration;
+            }
+            
+            schedulerTimer = setTimeout(scheduler, lookahead * 1000);
+        }
+        
+        // Обновление шагов
+        function updateSteps() {
+            // Обновление мастер-паттерна
+            if (masterPattern.enabled) {
+                if (masterPattern.loopType === 'normal') {
+                    masterPattern.step = (masterPattern.step + 1) % masterPattern.length;
+                } else { // pingpong
+                    if (masterPattern.direction === 1) {
+                        if (masterPattern.step < masterPattern.length - 1) {
+                            masterPattern.step++;
+                        } else {
+                            masterPattern.step--;
+                            masterPattern.direction = -1;
+                        }
+                    } else {
+                        if (masterPattern.step > 0) {
+                            masterPattern.step--;
+                        } else {
+                            masterPattern.step++;
+                            masterPattern.direction = 1;
+                        }
+                    }
+                }
+                
+                // Если активен шаг мастер-паттерна, сбрасываем все треки
+                if (masterPattern.pattern[masterPattern.step]) {
+                    resetAllTrackSteps();
+                }
+            }
+            
+            // Обновление треков
+            tracks.forEach(track => {
+                if (track.loopType === 'normal') {
+                    track.step = (track.step + 1) % track.length;
+                } else { // pingpong
+                    if (track.direction === 1) {
+                        if (track.step < track.length - 1) {
+                            track.step++;
+                        } else {
+                            track.step--;
+                            track.direction = -1;
+                        }
+                    } else {
+                        if (track.step > 0) {
+                            track.step--;
+                        } else {
+                            track.step++;
+                            track.direction = 1;
+                        }
+                    }
+                }
+            });
+            
+            updatePlaybackDisplay();
+            updateMasterPlaybackDisplay();
+        }
+        
+        // Сброс шагов всех треков
+        function resetAllTrackSteps() {
+            tracks.forEach(track => {
+                track.step = 0;
+                track.direction = 1;
+            });
+        }
+        
+        // Проигрывание шага
+        function playStep(when) {
+            tracks.forEach((track, trackId) => {
+                if (track.pattern[track.step]) {
+                    playSound(track.settings.type, when, trackId, track.params);
+                }
+            });
+        }
+        
+        // Проигрывание звука с BPF фильтром
+        function playSound(type, when, trackId, params) {
+            switch(type) {
+                case 'kick':
+                    playKick(when, trackId, params);
+                    break;
+                case 'snare':
+                    playSnare(when, trackId, params);
+                    break;
+                case 'hihat':
+                    playHiHat(when, trackId, params);
+                    break;
+                case 'tom':
+                    playTom(when, trackId, params);
+                    break;
+                case 'bell':
+                    playBell(when, trackId, params);
+                    break;
+            }
+        }
+        
+        // Проигрывание кика с BPF фильтром
+        function playKick(when, trackId, params) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            // Применение параметров
+            const startPitch = params.startPitch;
+            const endPitch = params.endPitch;
+            const duration = params.duration / 1000;
+            const volume = params.volume / 100;
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(startPitch, when);
+            oscillator.frequency.exponentialRampToValueAtTime(endPitch, when + duration);
+            
+            gainNode.gain.setValueAtTime(volume, when);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, when + duration);
+            
+            // FM модуляция
+            if (params.fm > 0) {
+                const fmOsc = audioContext.createOscillator();
+                const fmGain = audioContext.createGain();
+                
+                fmOsc.type = 'sine';
+                fmOsc.frequency.value = 100;
+                fmGain.gain.value = params.fm * 10;
+                
+                fmOsc.connect(fmGain);
+                fmGain.connect(oscillator.frequency);
+                
+                fmOsc.start(when);
+                fmOsc.stop(when + duration);
+            }
+            
+            // Кольцевая модуляция
+            let finalNode = gainNode;
+            if (params.ringMod) {
+                const ringModOsc = audioContext.createOscillator();
+                const ringModGain = audioContext.createGain();
+                
+                ringModOsc.type = 'sine';
+                ringModOsc.frequency.value = params.ringModFreq;
+                ringModGain.gain.value = params.ringModDepth / 100;
+                
+                const ringModulator = audioContext.createGain();
+                ringModulator.gain.value = 0;
+                
+                ringModOsc.connect(ringModGain);
+                ringModGain.connect(ringModulator.gain);
+                
+                oscillator.connect(ringModulator);
+                ringModulator.connect(gainNode);
+                
+                ringModOsc.start(when);
+                ringModOsc.stop(when + duration);
+                
+                finalNode = gainNode;
+            } else {
+                oscillator.connect(gainNode);
+            }
+            
+            // BPF фильтр
+            let outputNode = finalNode;
+            if (params.bpfEnabled) {
+                const bpf = audioContext.createBiquadFilter();
+                bpf.type = 'bandpass';
+                bpf.frequency.value = params.bpfFrequency;
+                bpf.Q.value = params.bpfQ;
+                
+                finalNode.connect(bpf);
+                outputNode = bpf;
+            }
+            
+            outputNode.connect(audioContext.destination);
+            
+            oscillator.start(when);
+            oscillator.stop(when + duration);
+        }
+        
+        // Проигрывание снэйра с BPF фильтром
+        function playSnare(when, trackId, params) {
+            // Тональная часть
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            const startPitch = params.startPitch;
+            const endPitch = params.endPitch;
+            const duration = params.duration / 1000;
+            const volume = params.volume / 100 * 0.7;
+            
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(startPitch, when);
+            oscillator.frequency.exponentialRampToValueAtTime(endPitch, when + duration);
+            
+            gainNode.gain.setValueAtTime(volume, when);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, when + duration);
+            
+            // Кольцевая модуляция для тональной части
+            let finalNode = gainNode;
+            if (params.ringMod) {
+                const ringModOsc = audioContext.createOscillator();
+                const ringModGain = audioContext.createGain();
+                
+                ringModOsc.type = 'sine';
+                ringModOsc.frequency.value = params.ringModFreq;
+                ringModGain.gain.value = params.ringModDepth / 100;
+                
+                const ringModulator = audioContext.createGain();
+                ringModulator.gain.value = 0;
+                
+                ringModOsc.connect(ringModGain);
+                ringModGain.connect(ringModulator.gain);
+                
+                oscillator.connect(ringModulator);
+                ringModulator.connect(gainNode);
+                
+                ringModOsc.start(when);
+                ringModOsc.stop(when + duration);
+                
+                finalNode = gainNode;
+            } else {
+                oscillator.connect(gainNode);
+            }
+            
+            // BPF фильтр для тональной части
+            let outputNode = finalNode;
+            if (params.bpfEnabled) {
+                const bpf = audioContext.createBiquadFilter();
+                bpf.type = 'bandpass';
+                bpf.frequency.value = params.bpfFrequency;
+                bpf.Q.value = params.bpfQ;
+                
+                finalNode.connect(bpf);
+                outputNode = bpf;
+            }
+            
+            outputNode.connect(audioContext.destination);
+            
+            oscillator.start(when);
+            oscillator.stop(when + duration);
+            
+            // Шумовая часть
+            const bufferSize = audioContext.sampleRate * duration;
+            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            
+            const noise = audioContext.createBufferSource();
+            noise.buffer = noiseBuffer;
+            
+            const noiseFilter = audioContext.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = params.filter;
+            
+            const noiseGain = audioContext.createGain();
+            noiseGain.gain.setValueAtTime(params.volume / 100, when);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, when + duration);
+            
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
+            
+            noise.start(when);
+        }
+        
+        // Проигрывание хай-хэта с полифонией и BPF фильтром
+        function playHiHat(when, trackId, params) {
+            const fundamental = 40 + params.startPitch / 10;
+            const ratios = [2, 3, 4.16, 5.43, 6.79, 8.23];
+            
+            const gainNode = audioContext.createGain();
+            const volume = params.volume / 100;
+            const duration = params.duration / 1000;
+            
+            gainNode.gain.setValueAtTime(volume, when);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, when + duration);
+            
+            // Создаем каждый осциллятор для хай-хэта
+            ratios.forEach((ratio, i) => {
+                const oscillator = audioContext.createOscillator();
+                oscillator.type = 'square';
+                oscillator.frequency.value = fundamental * ratio;
+                
+                const bandpass = audioContext.createBiquadFilter();
+                bandpass.type = 'bandpass';
+                bandpass.frequency.value = params.filter;
+                
+                // Добавляем небольшой резонанс для более насыщенного звука
+                bandpass.Q.value = 5;
+                
+                oscillator.connect(bandpass);
+                bandpass.connect(gainNode);
+                
+                oscillator.start(when);
+                oscillator.stop(when + duration);
+            });
+            
+            // BPF фильтр для хай-хэта
+            let outputNode = gainNode;
+            if (params.bpfEnabled) {
+                const bpf = audioContext.createBiquadFilter();
+                bpf.type = 'bandpass';
+                bpf.frequency.value = params.bpfFrequency;
+                bpf.Q.value = params.bpfQ;
+                
+                gainNode.connect(bpf);
+                outputNode = bpf;
+            }
+            
+            outputNode.connect(audioContext.destination);
+        }
+        
+        // Проигрывание тома с BPF фильтром
+        function playTom(when, trackId, params) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            const startPitch = 80 + trackId * 20 + params.startPitch;
+            const endPitch = startPitch * 0.5;
+            const duration = params.duration / 1000;
+            const volume = params.volume / 100;
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(startPitch, when);
+            oscillator.frequency.exponentialRampToValueAtTime(endPitch, when + duration);
+            
+            gainNode.gain.setValueAtTime(volume, when);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, when + duration);
+            
+            // Кольцевая модуляция
+            let finalNode = gainNode;
+            if (params.ringMod) {
+                const ringModOsc = audioContext.createOscillator();
+                const ringModGain = audioContext.createGain();
+                
+                ringModOsc.type = 'sine';
+                ringModOsc.frequency.value = params.ringModFreq;
+                ringModGain.gain.value = params.ringModDepth / 100;
+                
+                const ringModulator = audioContext.createGain();
+                ringModulator.gain.value = 0;
+                
+                ringModOsc.connect(ringModGain);
+                ringModGain.connect(ringModulator.gain);
+                
+                oscillator.connect(ringModulator);
+                ringModulator.connect(gainNode);
+                
+                ringModOsc.start(when);
+                ringModOsc.stop(when + duration);
+                
+                finalNode = gainNode;
+            } else {
+                oscillator.connect(gainNode);
+            }
+            
+            // BPF фильтр
+            let outputNode = finalNode;
+            if (params.bpfEnabled) {
+                const bpf = audioContext.createBiquadFilter();
+                bpf.type = 'bandpass';
+                bpf.frequency.value = params.bpfFrequency;
+                bpf.Q.value = params.bpfQ;
+                
+                finalNode.connect(bpf);
+                outputNode = bpf;
+            }
+            
+            outputNode.connect(audioContext.destination);
+            
+            oscillator.start(when);
+            oscillator.stop(when + duration);
+        }
+        
+        // Проигрывание колокольчика с BPF фильтром
+        function playBell(when, trackId, params) {
+            const carrier = audioContext.createOscillator();
+            const modulator = audioContext.createOscillator();
+            const modulatorGain = audioContext.createGain();
+            const gainNode = audioContext.createGain();
+            
+            const carrierFreq = 220 + params.startPitch;
+            const modulatorFreq = carrierFreq * 3;
+            const volume = params.volume / 100;
+            const duration = params.duration / 500; // Увеличенная длительность для колокольчика
+            
+            carrier.type = 'sine';
+            carrier.frequency.value = carrierFreq;
+            
+            modulator.type = 'sine';
+            modulator.frequency.value = modulatorFreq;
+            modulatorGain.gain.value = params.fm * 5;
+            
+            gainNode.gain.setValueAtTime(volume, when);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, when + duration);
+            
+            modulator.connect(modulatorGain);
+            modulatorGain.connect(carrier.frequency);
+            carrier.connect(gainNode);
+            
+            // Кольцевая модуляция
+            let finalNode = gainNode;
+            if (params.ringMod) {
+                const ringModOsc = audioContext.createOscillator();
+                const ringModGain = audioContext.createGain();
+                
+                ringModOsc.type = 'sine';
+                ringModOsc.frequency.value = params.ringModFreq;
+                ringModGain.gain.value = params.ringModDepth / 100;
+                
+                const ringModulator = audioContext.createGain();
+                ringModulator.gain.value = 0;
+                
+                ringModOsc.connect(ringModGain);
+                ringModGain.connect(ringModulator.gain);
+                
+                gainNode.connect(ringModulator);
+                ringModulator.connect(audioContext.destination);
+                
+                ringModOsc.start(when);
+                ringModOsc.stop(when + duration);
+                
+                finalNode = ringModulator;
+            } else {
+                gainNode.connect(audioContext.destination);
+            }
+            
+            // BPF фильтр
+            let outputNode = finalNode;
+            if (params.bpfEnabled) {
+                const bpf = audioContext.createBiquadFilter();
+                bpf.type = 'bandpass';
+                bpf.frequency.value = params.bpfFrequency;
+                bpf.Q.value = params.bpfQ;
+                
+                finalNode.connect(bpf);
+                outputNode = bpf;
+            }
+            
+            if (!params.ringMod) {
+                outputNode = outputNode || gainNode;
+            }
+            
+            outputNode.connect(audioContext.destination);
+            
+            carrier.start(when);
+            modulator.start(when);
+            carrier.stop(when + duration);
+            modulator.stop(when + duration);
+        }
+        
+        // Обновление узоров при изменении размера окна
+        window.addEventListener('resize', () => {
+            generatePersianPatterns();
+        });
+    </script>
+</body>
+</html>
