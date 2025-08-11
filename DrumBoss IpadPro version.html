@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DRUMBOSS - IPAD PRO EDITION</title>
+<style>
+  :root{
+    --bg:#f3f2ea; --fg:#000; --line:#000; --muted:#777; --panel:#efeee6; --invert:#fff;
+  }
+  html,body{ margin:0; background:var(--bg); color:var(--fg);
+    font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", "SF Mono",
+      "DejaVu Sans Mono", "Liberation Mono", "Courier New", monospace;
+    image-rendering: pixelated; }
+  .strip{ border-bottom:2px solid var(--line); padding:8px 10px; display:flex; gap:10px; align-items:center; background:var(--bg); flex-wrap:wrap; }
+  .title{ font-weight:700; letter-spacing:1px; }
+  .boxed{ border:2px solid var(--line); padding:6px 8px; background:var(--bg); }
+  button, select, input[type="number"], input[type="text"]{
+    background:var(--bg); color:var(--fg); border:2px solid var(--line); padding:4px 8px; font:inherit; outline:none;
+  }
+  button:active{ background:var(--fg); color:var(--invert); }
+  .grid{ display:grid; grid-template-columns: auto 1fr auto; gap:6px; align-items:start;
+         border-bottom:2px solid var(--line); padding:8px 10px; }
+  .rowHead{ display:flex; gap:6px; align-items:center; min-width:260px; flex-wrap:wrap; }
+  .rowHead .name{ font-weight:700; padding:0 6px; border-left:2px solid var(--line); border-right:2px solid var(--line); }
+  .cells{ display:grid; grid-auto-flow:column; gap:2px; align-items:center; }
+  .cell{ width:20px; height:20px; border:2px solid var(--line); background:transparent;
+         display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; }
+  .cell.active{ background:#000; color:#fff; }
+  .cell .vel{ position:absolute; bottom:0; left:0; width:100%; background:#fff; mix-blend-mode:difference; pointer-events:none; }
+  .loopBox{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .panel{ grid-column:1/-1; border:2px solid var(--line); background:var(--panel); padding:8px; margin:6px 0 12px 0; display:none; }
+  .panel.open{ display:block; }
+  .panel h4{ margin:4px 0 6px 0; border-bottom:2px solid var(--line); padding-bottom:4px; }
+  .kv{ display:grid; grid-template-columns: 180px 1fr 80px; gap:6px; align-items:center; margin:4px 0; }
+  .slider{ width:100%; }
+  .modBox{ grid-column:1/-1; padding:8px 0 4px 0; }
+  .modBar{ display:flex; gap:8px; align-items:center; margin:6px 0 2px 0; flex-wrap:wrap; }
+  .badge{ border:2px solid var(--line); padding:2px 6px; background:var(--bg); }
+  .canvasWrap{ border:2px solid var(--line); background:var(--bg); height:56px; position:relative; }
+  canvas{ width:100%; height:100%; display:block; }
+  .muted{ opacity:0.5; }
+  .lfoSection{ border-top:2px solid var(--line); border-bottom:2px solid var(--line); padding:8px 10px; }
+  .lfoRow{ display:grid; grid-template-columns: 60px 1fr 1fr 1fr; gap:8px; align-items:center; margin:6px 0; }
+  .note{ padding:6px 10px; border-top:2px solid var(--line); color:var(--muted); font-size:12px; }
+  .playing{ outline:2px dashed var(--line); outline-offset:-2px; }
+  /* Popover for +M */
+  .popover{
+    position:absolute; z-index:10; border:2px solid var(--line); background:var(--panel); padding:6px; max-height:220px; overflow:auto; min-width:220px;
+    box-shadow: 0 0 0 0 var(--line); /* строго плоско, Lisa vibe */
+  }
+  .paramBtn{ width:100%; text-align:left; }
+</style>
+</head>
+<body>
+
+<!-- TOP: Transport -->
+<div class="strip">
+  <div class="boxed">
+    <label>BPM <input id="bpm" type="number" min="20" max="300" step="1" value="120" style="width:72px"></label>
+  </div>
+  <button id="playBtn">PLAY</button>
+  <button id="stopBtn">STOP</button>
+  <button id="restartBtn">RESTART‑ALL‑PATTERNS</button>
+  <span class="note">Оставь надежду всяк сюда входящий.</span>
+</div>
+
+<!-- TITLE -->
+<div class="strip"><div class="title">DRUMBOSS NOKIA IPAD 2012</div></div>
+
+<!-- LFOs -->
+<div class="lfoSection">
+  <div><strong>5 LFO</strong> — rate, depth, target (volume/pan). Добавляй без пауз.</div>
+  <div style="margin-top:6px;"><button id="addLfoBtn">+ добавить LFO</button></div>
+  <div id="lfoList"></div>
+</div>
+
+<!-- PATTERN LIST -->
+<div id="list"></div>
+
+<div class="note">
+  
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ====== Audio Core ======
+  const Audio = { ctx:null, master:null };
+  function ensureAudio(){
+    if (!Audio.ctx){
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+      const master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+      Audio.ctx = ctx; Audio.master = master;
+    }
+    return Audio.ctx;
+  }
+  const now = () => (Audio.ctx?Audio.ctx.currentTime:0);
+
+  // Utils
+  const clamp01 = x=>Math.max(0,Math.min(1,x));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const semi = n=>Math.pow(2,n/12);
+  function setParam(ap, value, t){ try{ ap.cancelScheduledValues(t); ap.setTargetAtTime(value,t,0.01);}catch(e){ try{ ap.setValueAtTime(value,t);}catch(_){}} }
+
+  // Noise
+  function mkNoise(){
+    const ctx=ensureAudio(); const len=ctx.sampleRate*2;
+    const buf=ctx.createBuffer(1,len,ctx.sampleRate); const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    return buf;
+  }
+  const NOISE = mkNoise();
+
+  // Param ranges
+  const P = {
+    volume:{min:0,max:1}, pan:{min:-1,max:1},
+    filterCut:{min:50,max:12000}, filterQ:{min:0.1,max:20},
+    a:{min:0.001,max:0.5}, d:{min:0.005,max:1.2}, s:{min:0,max:1}, r:{min:0.01,max:2.5},
+    fm12:{min:0,max:800}, rmAmt:{min:0,max:1},
+    o1Semi:{min:-24,max:24}, o2Semi:{min:-24,max:24}, o3Semi:{min:-24,max:24},
+    noiseLevel:{min:0,max:1}, noiseCut:{min:200,max:16000}, noiseQ:{min:0.1,max:20},
+    bellFiltCut:{min:80,max:12000}, bellFiltQ:{min:0.1,max:20},
+    bellEnvA:{min:0.001,max:0.6}, bellEnvD:{min:0.005,max:2}, bellEnvS:{min:0,max:1}, bellEnvR:{min:0.01,max:4},
+    bellO1Semi:{min:-36,max:36}, bellO2Semi:{min:-36,max:36}, bellO3Semi:{min:-36,max:36},
+    bellChord1:{min:-24,max:24}, bellChord2:{min:-24,max:24}, bellChord3:{min:-24,max:24}, bellChord4:{min:-24,max:24},
+    snHpCut:{min:1000,max:12000}, snBpCut:{min:400,max:8000}, snBpQ:{min:0.1,max:20},
+    snNoise1:{min:0,max:1}, snNoise2:{min:0,max:1}, snTriRM:{min:0,max:1},
+    snFiltCut:{min:200,max:12000}, snFiltQ:{min:0.1,max:20},
+  };
+
+  // Graph helpers
+  function ringMod(input, mod, amt){ const ctx=ensureAudio(); const mult=ctx.createGain(); const g=ctx.createGain();
+    g.gain.value=amt; mod.connect(g).connect(mult.gain); input.connect(mult); return mult; }
+  function fm(mod, car, depth){ const ctx=ensureAudio(); const g=ctx.createGain(); g.gain.value=depth; mod.connect(g).connect(car.frequency); }
+  function biq(type,cut,q){ const f=ensureAudio().createBiquadFilter(); f.type=type; f.frequency.value=cut; f.Q.value=q; return f; }
+  function adsr(ap, t0, a,d,s,r, vel=1){
+    const A=Math.max(0.001,a), D=Math.max(0.001,d), S=clamp01(s);
+    ap.cancelScheduledValues(t0); ap.setValueAtTime(0,t0);
+    ap.linearRampToValueAtTime(vel, t0+A); ap.linearRampToValueAtTime(vel*S, t0+A+D);
+    return { off:(tOff)=>{ ap.cancelScheduledValues(tOff); ap.setTargetAtTime(0,tOff,Math.max(0.01,r*0.33)); } };
+  }
+  function fEnv(param,t0,a,d,s,r,minV,maxV){
+    param.cancelScheduledValues(t0);
+    param.setValueAtTime(minV,t0);
+    param.linearRampToValueAtTime(maxV,t0+a);
+    param.linearRampToValueAtTime(lerp(minV,maxV,s), t0+a+d);
+    return { off:(tOff)=>{ param.cancelScheduledValues(tOff); param.setTargetAtTime(minV,tOff,Math.max(0.01,r*0.33)); } };
+  }
+
+  // Channels
+  function mkChannel(){ const ctx=ensureAudio(); const gain=ctx.createGain(); gain.gain.value=.8;
+    const pan=ctx.createStereoPanner ? ctx.createStereoPanner():null;
+    if (pan){ gain.connect(pan).connect(Audio.master); } else { gain.connect(Audio.master); }
+    return { input:gain, pan };
+  }
+
+  // Engines
+  function trigBase3(opts,t,len,vel){
+    const ctx=ensureAudio(); const o1=ctx.createOscillator(),o2=ctx.createOscillator(),o3=ctx.createOscillator();
+    o1.type=opts.o1Type; o2.type=opts.o2Type; o3.type=opts.o3Type;
+    o1.frequency.value = opts.baseFreq*semi(opts.o1Semi||0);
+    o2.frequency.value = opts.baseFreq*semi(opts.o2Semi||0);
+    o3.frequency.value = opts.baseFreq*semi(opts.o3Semi||0);
+    if (opts.fm12) fm(o1,o2,opts.fm12);
+    const pre=ctx.createGain(); const filt=biq(opts.filterType||'lowpass', opts.filterCut||8000, opts.filterQ||0.7);
+    o2.connect(pre).connect(filt);
+    const rm = ringMod(filt, o3, clamp01(opts.rmAmt||0));
+    const amp=ctx.createGain(); amp.gain.value=0; rm.connect(amp).connect(opts.out);
+    const env=adsr(amp.gain,t,opts.a,opts.d,opts.s,opts.r,vel);
+    if (opts.pitchEnv){ o2.frequency.setValueAtTime(opts.pitchEnv.start,t);
+      o2.frequency.exponentialRampToValueAtTime(Math.max(1,opts.pitchEnv.end), t+opts.pitchEnv.time); }
+    o1.start(t); o2.start(t); o3.start(t); const stop=t+len+opts.r+0.05;
+    o1.stop(stop); o2.stop(stop); o3.stop(stop); env.off(t+len);
+  }
+  function trigHat(opts,t,len,vel){
+    const ctx=ensureAudio(); const o1=ctx.createOscillator(),o2=ctx.createOscillator(),o3=ctx.createOscillator();
+    o1.type=opts.o1Type; o2.type=opts.o2Type; o3.type=opts.o3Type;
+    o1.frequency.value = 4000*semi(opts.o1Semi||0);
+    o2.frequency.value = 8000*semi(opts.o2Semi||0);
+    o3.frequency.value = 1200*semi(opts.o3Semi||0);
+    if (opts.fm12) fm(o1,o2,opts.fm12);
+    const rm = ringMod(o2,o3,clamp01(opts.rmAmt||0));
+    const tonal = biq(opts.filterType||'highpass', opts.filterCut||6000, opts.filterQ||0.8);
+    const noise = ctx.createBufferSource(); noise.buffer=NOISE; noise.loop=true;
+    const nF = biq(opts.noiseFilterType||'highpass', opts.noiseCut||8000, opts.noiseQ||0.7);
+    const nG = ctx.createGain(); nG.gain.value = opts.noiseLevel ?? 0.9;
+    const mix=ctx.createGain(); rm.connect(tonal).connect(mix); noise.connect(nF).connect(nG).connect(mix);
+    const amp=ctx.createGain(); amp.gain.value=0; mix.connect(amp).connect(opts.out);
+    const env=adsr(amp.gain,t,opts.a,opts.d,opts.s,opts.r,vel);
+    o1.start(t); o2.start(t); o3.start(t); noise.start(t); const stop=t+len+opts.r+0.05;
+    o1.stop(stop); o2.stop(stop); o3.stop(stop); noise.stop(stop); env.off(t+len);
+  }
+  function trigBell(opts,t,len,vel){
+    const ctx=ensureAudio();
+    function bell(semiShift,weight){
+      const out=ctx.createGain(); out.gain.value=weight;
+      const a=ctx.createOscillator(), b=ctx.createOscillator(), c=ctx.createOscillator(), d=ctx.createOscillator();
+      a.type='sine'; b.type='sine'; c.type='sine'; d.type='sine';
+      const base=(opts.baseFreq||440)*semi(semiShift);
+      a.frequency.value=base*semi(opts.bellO1Semi||0);
+      b.frequency.value=base*semi(opts.bellO2Semi||7);
+      c.frequency.value=base*semi(opts.bellO3Semi||12);
+      d.frequency.value=base*0.5;
+      if (opts.fm12) fm(a,b,opts.fm12);
+      const fm23 = opts.fm23 || (opts.fm12?opts.fm12*0.5:0); if (fm23) fm(b,c,fm23);
+      const pre=ctx.createGain(); c.connect(pre);
+      const rm=ringMod(pre,d,clamp01(opts.rmAmt||0.5));
+      const filt=biq(opts.filterType||'lowpass', opts.bellFiltCut||6000, opts.bellFiltQ||1.2);
+      rm.connect(filt);
+      const fenv=fEnv(filt.frequency,t,opts.bellEnvA||.01,opts.bellEnvD||.8,opts.bellEnvS||0,opts.bellEnvR||1.2,(opts.bellFiltCut||6000)*0.25,(opts.bellFiltCut||6000));
+      setTimeout(()=>fenv.off(t+len),0);
+      const amp=ctx.createGain(); amp.gain.value=0; filt.connect(amp).connect(out);
+      const env=adsr(amp.gain,t,opts.a||.002,opts.d||.6,opts.s||0,opts.r||1.4,vel);
+      const stop=t+len+Math.max(opts.r||0,opts.bellEnvR||0)+0.1;
+      a.start(t); b.start(t); c.start(t); d.start(t); a.stop(stop); b.stop(stop); c.stop(stop); d.stop(stop);
+      env.off(t+len);
+      return out;
+    }
+    const sum=ctx.createGain(); sum.gain.value=1;
+    if (opts.chordMode){
+      const w=.6; bell(opts.bellChord1||0,w).connect(sum);
+      bell(opts.bellChord2||4,w).connect(sum);
+      bell(opts.bellChord3||7,w).connect(sum);
+      bell(opts.bellChord4||12,w).connect(sum);
+    } else { bell(0,1).connect(sum); }
+    const out=ctx.createGain(); sum.connect(out).connect(opts.out);
+  }
+  function trigSnare(opts,t,len,vel){
+    const ctx=ensureAudio();
+    const tr1=ctx.createOscillator(), tr2=ctx.createOscillator(); tr1.type='triangle'; tr2.type='triangle';
+    tr1.frequency.value=180; tr2.frequency.value=330; const tri=ringMod(tr1,tr2,clamp01(opts.snTriRM||0.4));
+    const n1=ctx.createBufferSource(), n2=ctx.createBufferSource(); n1.buffer=NOISE; n2.buffer=NOISE; n1.loop=n2.loop=true;
+    const hp=biq('highpass', opts.snHpCut||3000, 0.707); const bp=biq('bandpass', opts.snBpCut||1800, opts.snBpQ||1.5);
+    const g1=ctx.createGain(), g2=ctx.createGain(); g1.gain.value=opts.snNoise1 ?? 0.7; g2.gain.value=opts.snNoise2 ?? 0.5;
+    n1.connect(hp).connect(g1); n2.connect(bp).connect(g2);
+    const mix=ctx.createGain(); tri.connect(mix); g1.connect(mix); g2.connect(mix);
+    const filt=biq(opts.filterType||'highpass', opts.snFiltCut||4000, opts.snFiltQ||0.9); mix.connect(filt);
+    const amp=ctx.createGain(); amp.gain.value=0; filt.connect(amp).connect(opts.out);
+    const env=adsr(amp.gain,t,opts.a||.001,opts.d||.12,opts.s||0,opts.r||.18,vel);
+    const stop=t+len+(opts.r||0)+0.05;
+    tr1.start(t); tr2.start(t); n1.start(t); n2.start(t);
+    tr1.stop(stop); tr2.stop(stop); n1.stop(stop); n2.stop(stop);
+    env.off(t+len);
+  }
+
+  // Defaults
+  function defParams(kind){
+    const base={ volume:.8, pan:0, filterType:'lowpass', filterCut:8000, filterQ:.7, a:.002,d:.08,s:0,r:.12,
+      fm12:0, rmAmt:0, o1Type:'sine', o2Type:'sine', o3Type:'sine', o1Semi:0, o2Semi:0, o3Semi:0 };
+    if (kind.startsWith('KICK')) return { ...base, baseFreq:50, fm12:120, rmAmt:.2, pitchEnv:{start:180,end:50,time:.045} };
+    if (kind==='SNARE') return { ...base, filterType:'highpass', snHpCut:3000, snBpCut:1800, snBpQ:1.5, snNoise1:.7, snNoise2:.5, snTriRM:.4, snFiltCut:4000, snFiltQ:.9, a:.001,d:.12,s:0,r:.18 };
+    if (kind==='HAT-C') return { ...base, baseFreq:800, o1Type:'square', o2Type:'square', o3Type:'sine', fm12:60, rmAmt:.6, filterType:'highpass', filterCut:6000, filterQ:.8, noiseFilterType:'highpass', noiseCut:8000, noiseQ:.7, noiseLevel:.9, a:.001,d:.05,s:0,r:.03 };
+    if (kind==='HAT-O') return { ...base, baseFreq:600, o1Type:'square', o2Type:'square', o3Type:'sine', fm12:40, rmAmt:.4, filterType:'highpass', filterCut:5000, filterQ:.7, noiseFilterType:'bandpass', noiseCut:9000, noiseQ:.9, noiseLevel:.8, a:.001,d:.25,s:0,r:.18 };
+    if (kind==='BELL') return { ...base, baseFreq:440, fm12:180, rmAmt:.5, a:.002,d:.6,s:0,r:1.4,
+      bellFiltCut:6000, bellFiltQ:1.2, bellEnvA:.005, bellEnvD:.8, bellEnvS:0, bellEnvR:1.2,
+      bellO1Semi:0, bellO2Semi:7, bellO3Semi:12, chordMode:false, bellChord1:0, bellChord2:4, bellChord3:7, bellChord4:12 };
+    return base;
+  }
+
+  // Instruments
+  const instruments = [
+    { id:'KICK1', kind:'KICK1', label:'KICK A' },
+    { id:'KICK2', kind:'KICK2', label:'KICK B' },
+    { id:'SNARE', kind:'SNARE', label:'SNARE' },
+    { id:'HATC',  kind:'HAT-C', label:'HAT C' },
+    { id:'HATO',  kind:'HAT-O', label:'HAT O' },
+    { id:'BELL',  kind:'BELL',  label:'BELL' }
+  ];
+
+  // Tracks
+  function emptyPat(n=16){ return Array.from({length:n}, ()=>({trig:false})); }
+  function modArr(n=16,fill=1){ const a=new Float32Array(n); a.fill(fill); return a; }
+
+  const tracks = instruments.map(ins=>({
+    id:ins.id, label:ins.label, kind:ins.kind,
+    channel: mkChannel(), muted:false,
+    pattern: emptyPat(16), length:16, loopMode:'forward', index:0, dirFwd:true,
+    params: defParams(ins.kind),
+    mods: { velocity: modArr(16,1) }, currentModKey:'velocity', modDisplayKey:'velocity',
+    elements:{}
+  }));
+
+  // Real-time LFO (volume/pan)
+  function getParamTarget(track,key){
+    if (key==='volume') return { node: track.channel.input.gain };
+    if (key==='pan' && track.channel.pan) return { node: track.channel.pan.pan };
+    return null;
+  }
+  const LFOs=[];
+  function mkLFO(){
+    const ctx=ensureAudio(); const osc=ctx.createOscillator(), g=ctx.createGain();
+    osc.type='sine'; osc.frequency.value=2; g.gain.value=0; osc.connect(g); osc.start();
+    return { osc,g, connect(p){ try{ this.g.disconnect(); }catch(_){ } if (p) this.g.connect(p.node); } };
+  }
+
+  // Transport
+  let playing=false, timer=null, nextTime=0, stepIdx=0;
+  const lookahead=.08, tickMs=25;
+  const stepDur = ()=> (60/(parseFloat(document.getElementById('bpm').value)||120))/4;
+  function schedule(){
+    const ctx=ensureAudio();
+    while (nextTime < ctx.currentTime + lookahead){
+      tick(nextTime, stepIdx); nextTime += stepDur(); stepIdx++;
+    }
+  }
+  function start(){ ensureAudio(); if (playing) return; playing=true; nextTime=now()+.05; timer=setInterval(schedule,tickMs); }
+  function stop(){ if (!playing) return; playing=false; clearInterval(timer); timer=null; }
+  function restart(){ tracks.forEach(t=>{ t.index=0; t.dirFwd=true; }); nextTime=now()+.05; stepIdx=0; }
+
+  function advIndex(track){
+    const L=track.length;
+    if (track.loopMode==='random'){ track.index = Math.floor(Math.random()*L); return; }
+    if (track.loopMode==='pingpong'){
+      if (track.dirFwd){ track.index++; if (track.index>=L-1){ track.index=L-1; track.dirFwd=false; } }
+      else { track.index--; if (track.index<=0){ track.index=0; track.dirFwd=true; } }
+      return;
+    }
+    track.index = (track.index+1)%L;
+  }
+
+  function tick(t, globalStep){
+    tracks.forEach(track=>{
+      const i = track.index;
+      hi(track, i);
+      if (track.pattern[i]?.trig && !track.muted){
+        const vel = clamp01(track.mods.velocity?.[i%track.mods.velocity.length] ?? 1);
+        const mk = track.currentModKey;
+        if (mk && mk!=='velocity' && track.mods[mk]){
+          applyStepParam(track, mk, track.mods[mk][i % track.mods[mk].length], t);
+        }
+        play(track, t, vel);
+      }
+      advIndex(track);
+    });
+  }
+
+  function play(track, t, vel){
+    const ch=track.channel, p=track.params;
+    setParam(ch.input.gain, p.volume, t); if (ch.pan) setParam(ch.pan.pan, p.pan, t);
+    if (track.kind.startsWith('KICK')) return trigBase3({ ...p, out: ch.input }, t, .1, vel);
+    if (track.kind==='HAT-C') return trigHat({ ...p, out: ch.input }, t, .02, vel);
+    if (track.kind==='HAT-O') return trigHat({ ...p, out: ch.input }, t, .2, vel);
+    if (track.kind==='SNARE') return trigSnare({ ...p, out: ch.input }, t, .12, vel);
+    if (track.kind==='BELL') return trigBell({ ...p, out: ch.input }, t, .6, vel);
+  }
+
+  function hi(track, idx){
+    const cells = track.elements.cells; if (!cells) return;
+    cells.forEach(c=>c.classList.remove('playing')); const c=cells[idx]; if (c) c.classList.add('playing');
+    setTimeout(()=>{ if (c) c.classList.remove('playing'); }, Math.max(50, stepDur()*1000*.9));
+  }
+
+  function applyStepParam(track, key, v01, t){
+    const meta=P[key]||{min:0,max:1}; const v=lerp(meta.min, meta.max, clamp01(v01));
+    track.params[key]=v;
+    if (key==='volume') setParam(track.channel.input.gain, v, t);
+    if (key==='pan' && track.channel.pan) setParam(track.channel.pan.pan, v, t);
+  }
+
+  // UI
+  const listEl=document.getElementById('list');
+  function makeRow(track){
+    const row=document.createElement('div'); row.className='grid';
+    const head=document.createElement('div'); head.className='rowHead';
+    const name=document.createElement('div'); name.className='name'; name.textContent=track.label;
+    const mute=document.createElement('button'); mute.textContent='MUTE';
+    mute.onclick=()=>{ track.muted=!track.muted; row.classList.toggle('muted', track.muted); mute.textContent=track.muted?'UNMUTE':'MUTE'; };
+    const paramBtn=document.createElement('button'); paramBtn.textContent='PARAM';
+    head.append(name, mute, paramBtn);
+
+    const cells=document.createElement('div'); cells.className='cells'; buildCells(track, cells);
+
+    const loop=document.createElement('div'); loop.className='loopBox';
+    const lenLbl=document.createElement('label'); lenLbl.textContent='LEN';
+    const len=document.createElement('input'); len.type='number'; len.min='1'; len.max='32'; len.step='1'; len.value=track.length;
+    const mode=document.createElement('select');
+    [['Forward','forward'],['Ping‑Pong','pingpong'],['Random','random']].forEach(([t,v])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; mode.appendChild(o); });
+    mode.value=track.loopMode;
+    mode.onchange=()=>track.loopMode=mode.value;
+    len.onchange=()=>{ const n=Math.max(1,Math.min(32,parseInt(len.value)||16)); track.length=n; resizePattern(track,n); buildCells(track,cells); rebuildModCanvas(track); };
+    loop.append(lenLbl, len, mode);
+
+    const panel=document.createElement('div'); panel.className='panel';
+    panel.appendChild(paramPanel(track));
+    paramBtn.onclick=()=>panel.classList.toggle('open');
+
+    // Mod bar: live select + +M popover
+    const modBox=document.createElement('div'); modBox.className='modBox';
+    const modBar=document.createElement('div'); modBar.className='modBar';
+    const modBadge=document.createElement('span'); modBadge.className='badge'; modBadge.textContent='Модуляция: velocity';
+    const modSelect=document.createElement('select'); modSelect.style.minWidth='240px';
+    function rebuildModDropdown(){
+      modSelect.innerHTML=''; Object.keys(track.mods).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; modSelect.appendChild(o); });
+      modSelect.value = track.modDisplayKey;
+    }
+    modSelect.onchange=()=>{ track.modDisplayKey=modSelect.value; track.currentModKey=modSelect.value; modBadge.textContent=`Модуляция: ${track.modDisplayKey}`; rebuildModCanvas(track); };
+
+    // +M popover
+    const addBtn=document.createElement('button'); addBtn.textContent='+М';
+    let pop=null;
+    addBtn.onclick=(e)=>{
+      e.stopPropagation();
+      // toggle popover
+      if (pop){ pop.remove(); pop=null; return; }
+      pop=document.createElement('div'); pop.className='popover';
+      const list = availableTargets(track);
+      list.forEach(k=>{
+        const b=document.createElement('button'); b.className='paramBtn'; b.textContent=k;
+        b.onclick=()=>{
+          if (!track.mods[k]) track.mods[k]=modArr(track.length, k==='velocity'?1:0);
+          track.modDisplayKey=k; track.currentModKey=k; modBadge.textContent=`Модуляция: ${k}`;
+          rebuildModDropdown(); rebuildModCanvas(track);
+          pop.remove(); pop=null;
+        };
+        pop.appendChild(b);
+      });
+      // position near button
+      const r = addBtn.getBoundingClientRect();
+      pop.style.top = (window.scrollY + r.bottom + 4) + 'px';
+      pop.style.left = (window.scrollX + r.left) + 'px';
+      document.body.appendChild(pop);
+    };
+    document.addEventListener('click',(e)=>{ if (pop && !pop.contains(e.target) && e.target!==addBtn){ pop.remove(); pop=null; } });
+
+    modBar.append(modBadge, addBtn, document.createTextNode('Модуляция:'), modSelect);
+
+    const canvasWrap=document.createElement('div'); canvasWrap.className='canvasWrap';
+    const canvas=document.createElement('canvas'); canvas.width=800; canvas.height=120; canvasWrap.appendChild(canvas);
+
+    modBox.append(modBar, canvasWrap);
+
+    row.append(head, cells, loop, panel, modBox);
+    listEl.appendChild(row);
+
+    track.elements.row=row; track.elements.cellsWrap=cells;
+    track.elements.cells = Array.from(cells.querySelectorAll('.cell'));
+    track.elements.modCanvas=canvas; track.elements.modBadge=modBadge;
+    initModCanvas(track); rebuildModDropdown();
+    return row;
+  }
+
+  function buildCells(track, container){
+    container.innerHTML=''; container.style.gridTemplateColumns = `repeat(${track.length}, 20px)`;
+    track.elements.cells=[];
+    for (let i=0;i<track.length;i++){
+      const c=document.createElement('div'); c.className='cell'; c.title=`${i+1}`;
+      if (track.pattern[i]?.trig) c.classList.add('active');
+      const vel=document.createElement('div'); vel.className='vel';
+      const v=track.mods.velocity?.[i] ?? 1; vel.style.height=`${Math.round(clamp01(v)*100)}%`;
+      c.appendChild(vel);
+      c.onpointerdown=(e)=>{ e.preventDefault();
+        if (e.button===2){ const cur=track.mods.velocity[i]; track.mods.velocity[i]=clamp01((cur||0.5)-0.2); vel.style.height=`${Math.round(track.mods.velocity[i]*100)}%`; return; }
+        const on=!(track.pattern[i]?.trig); track.pattern[i].trig=on; c.classList.toggle('active', on);
+      };
+      c.oncontextmenu=(e)=>e.preventDefault();
+      container.appendChild(c); track.elements.cells.push(c);
+    }
+  }
+
+  function resizePattern(track, n){
+    const old=track.pattern.slice(); track.pattern = Array.from({length:n},(_,i)=> old[i]?old[i]:{trig:false});
+    for (const k in track.mods){
+      const oldA=track.mods[k]; const nu=new Float32Array(n);
+      for (let i=0;i<n;i++) nu[i]= oldA[i%oldA.length] ?? (k==='velocity'?1:0);
+      track.mods[k]=nu;
+    }
+  }
+
+  function paramPanel(track){
+    const panel=document.createElement('div');
+    function slider(label,key,metaKey,step){
+      const meta=P[metaKey||key]||{min:0,max:1};
+      const line=document.createElement('div'); line.className='kv';
+      const L=document.createElement('div'); L.textContent=label;
+      const S=document.createElement('input'); S.type='range'; S.className='slider';
+      S.min=meta.min; S.max=meta.max; S.step=step||((meta.max-meta.min)/200); S.value=track.params[key]??meta.min;
+      const N=document.createElement('input'); N.type='number'; N.value=S.value; N.step=S.step; N.min=S.min; N.max=S.max; N.style.width='80px';
+      function apply(v){ v=Number(v); if (isNaN(v)) return; v=Math.min(meta.max,Math.max(meta.min,v));
+        track.params[key]=v; S.value=v; N.value=v;
+        if (key==='volume') setParam(track.channel.input.gain, v, now());
+        if (key==='pan' && track.channel.pan) setParam(track.channel.pan.pan, v, now());
+      }
+      S.oninput=()=>apply(S.value); N.onchange=()=>apply(N.value);
+      line.append(L,S,N); panel.appendChild(line);
+    }
+    function sel(label,key,opts){
+      const line=document.createElement('div'); line.className='kv';
+      const L=document.createElement('div'); L.textContent=label;
+      const S=document.createElement('select'); opts.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; S.appendChild(o); });
+      S.value=track.params[key]; S.onchange=()=>{ track.params[key]=S.value; };
+      const PH=document.createElement('div'); PH.textContent=''; line.append(L,S,PH); panel.appendChild(line);
+    }
+
+    const h1=document.createElement('h4'); h1.textContent='Channel'; panel.appendChild(h1);
+    slider('Volume','volume','volume',0.01); slider('Pan','pan','pan',0.01);
+
+    const h2=document.createElement('h4'); h2.textContent='Synth — общие'; panel.appendChild(h2);
+    sel('Filter type','filterType',['lowpass','highpass','bandpass','notch']);
+    slider('Filter cutoff','filterCut','filterCut',1);
+    slider('Filter Q','filterQ','filterQ',0.01);
+    slider('A','a','a',0.001); slider('D','d','d',0.001); slider('S','s','s',0.01); slider('R','r','r',0.001);
+    slider('FM 1→2 (Hz)','fm12','fm12',1); slider('RingMod amount','rmAmt','rmAmt',0.01);
+    sel('Osc1 type','o1Type',['sine','triangle','sawtooth','square']);
+    sel('Osc2 type','o2Type',['sine','triangle','sawtooth','square']);
+    sel('Osc3 type','o3Type',['sine','triangle','sawtooth','square']);
+    slider('Osc1 semi','o1Semi','o1Semi',1); slider('Osc2 semi','o2Semi','o2Semi',1); slider('Osc3 semi','o3Semi','o3Semi',1);
+
+    if (track.kind==='HAT-C' || track.kind==='HAT-O'){
+      const h=document.createElement('h4'); h.textContent='HAT — шум и фильтр'; panel.appendChild(h);
+      sel('Noise filter','noiseFilterType',['highpass','bandpass','notch','lowpass']);
+      slider('Noise level','noiseLevel','noiseLevel',0.01);
+      slider('Noise cutoff','noiseCut','noiseCut',1);
+      slider('Noise Q','noiseQ','noiseQ',0.01);
+    }
+    if (track.kind==='BELL'){
+      const h=document.createElement('h4'); h.textContent='BELL — FM + Filter ADSR'; panel.appendChild(h);
+      slider('Bell O1 semi','bellO1Semi','bellO1Semi',1);
+      slider('Bell O2 semi','bellO2Semi','bellO2Semi',1);
+      slider('Bell O3 semi','bellO3Semi','bellO3Semi',1);
+      slider('Bell filter cut','bellFiltCut','bellFiltCut',1);
+      slider('Bell filter Q','bellFiltQ','bellFiltQ',0.01);
+      slider('Bell Env A','bellEnvA','bellEnvA',0.001);
+      slider('Bell Env D','bellEnvD','bellEnvD',0.001);
+      slider('Bell Env S','bellEnvS','bellEnvS',0.01);
+      slider('Bell Env R','bellEnvR','bellEnvR',0.001);
+      const line=document.createElement('div'); line.className='kv';
+      const L=document.createElement('div'); L.textContent='Chord mode (4 bells @60%)';
+      const C=document.createElement('input'); C.type='checkbox'; C.checked=!!track.params.chordMode; C.onchange=()=>track.params.chordMode=C.checked;
+      const PH=document.createElement('div'); line.append(L,C,PH); panel.appendChild(line);
+      slider('Chord note 1 semi','bellChord1','bellChord1',1);
+      slider('Chord note 2 semi','bellChord2','bellChord2',1);
+      slider('Chord note 3 semi','bellChord3','bellChord3',1);
+      slider('Chord note 4 semi','bellChord4','bellChord4',1);
+    }
+    if (track.kind==='SNARE'){
+      const h=document.createElement('h4'); h.textContent='SNARE — шумы и треугольники'; panel.appendChild(h);
+      slider('Noise 1 level','snNoise1','snNoise1',0.01);
+      slider('Noise 2 level','snNoise2','snNoise2',0.01);
+      slider('HP cut (noise1)','snHpCut','snHpCut',1);
+      slider('BP cut (noise2)','snBpCut','snBpCut',1);
+      slider('BP Q (noise2)','snBpQ','snBpQ',0.01);
+      slider('Triangle RM amt','snTriRM','snTriRM',0.01);
+      sel('Out filter type','filterType',['lowpass','highpass','bandpass','notch']);
+      slider('Out filter cut','snFiltCut','snFiltCut',1);
+      slider('Out filter Q','snFiltQ','snFiltQ',0.01);
+    }
+    return panel;
+  }
+
+  function availableTargets(track){
+    const keys=['velocity','volume','pan'];
+    if (track.kind!=='SNARE') keys.push('filterCut','filterQ','fm12','rmAmt','o1Semi','o2Semi','o3Semi');
+    if (track.kind==='HAT-C' || track.kind==='HAT-O') keys.push('noiseLevel','noiseCut','noiseQ');
+    if (track.kind==='BELL'){
+      keys.push('bellFiltCut','bellFiltQ','bellEnvA','bellEnvD','bellEnvS','bellEnvR','bellO1Semi','bellO2Semi','bellO3Semi',
+                'bellChord1','bellChord2','bellChord3','bellChord4');
+    }
+    if (track.kind==='SNARE') keys.push('snHpCut','snBpCut','snBpQ','snNoise1','snNoise2','snTriRM','snFiltCut','snFiltQ');
+    return keys;
+  }
+
+  function initModCanvas(track){
+    const canvas=track.elements.modCanvas; const ctx=canvas.getContext('2d'); let drag=false;
+    function draw(){
+      const W=canvas.width,H=canvas.height; const n=track.length, stepW=W/n;
+      ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg'); ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle='#000'; ctx.lineWidth=1;
+      for(let i=0;i<=n;i++){ const x=Math.round(i*stepW)+0.5; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(0,0.5); ctx.lineTo(W,0.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,H-0.5); ctx.lineTo(W,H-0.5); ctx.stroke();
+      const key=track.modDisplayKey||'velocity'; const arr=track.mods[key] || track.mods.velocity;
+      ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath();
+      for(let i=0;i<n;i++){
+        const v=arr[i]??0; const x=i*stepW+stepW/2; const y=(1-clamp01(v))*(H-2)+1;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        ctx.fillStyle='#000'; ctx.fillRect(x-2,y-2,4,4);
+      }
+      ctx.stroke();
+    }
+    function setAt(clientX,clientY){
+      const r=canvas.getBoundingClientRect(); const x=clientX-r.left, y=clientY-r.top;
+      const n=track.length; const step=Math.floor(clamp01(x/r.width)*n); const v=clamp01(1 - (y/r.height));
+      const key=track.modDisplayKey||'velocity'; if (!track.mods[key]) track.mods[key]=modArr(n, key==='velocity'?1:0);
+      track.mods[key][Math.max(0,Math.min(n-1,step))]=v;
+      if (key==='velocity' && track.elements.cells){
+        const c=track.elements.cells[step]; if (c){ const vb=c.querySelector('.vel'); if (vb) vb.style.height=`${Math.round(v*100)}%`; }
+      }
+      draw();
+    }
+    canvas.onpointerdown=e=>{ drag=true; setAt(e.clientX,e.clientY); };
+    window.addEventListener('pointermove',e=>{ if(drag) setAt(e.clientX,e.clientY); });
+    window.addEventListener('pointerup',()=>{ drag=false; });
+    track.elements.redrawMod=draw; draw();
+  }
+  function rebuildModCanvas(track){
+    if (track.elements.redrawMod) track.elements.redrawMod();
+    if (track.elements.cells){
+      for (let i=0;i<track.length;i++){
+        const c=track.elements.cells[i]; if (!c) continue;
+        const v=track.mods.velocity[i]??1; const vb=c.querySelector('.vel'); if (vb) vb.style.height=`${Math.round(clamp01(v)*100)}%`;
+      }
+    }
+  }
+
+  // LFO UI
+  const lfoList=document.getElementById('lfoList');
+  document.getElementById('addLfoBtn').onclick=()=>{
+	if (LFOs.length>=5) return;
+    ensureAudio();
+    const lfo = mkLFO(); LFOs.push(lfo);
+
+    const row=document.createElement('div'); row.className='lfoRow';
+    const lbl=document.createElement('div'); lbl.textContent=`LFO ${LFOs.length}`;
+
+    // rate
+    const rate=document.createElement('div');
+    const rateS=document.createElement('input'); rateS.type='range'; rateS.min='0.05'; rateS.max='20'; rateS.step='0.01'; rateS.value='2';
+    const rateN=document.createElement('input'); rateN.type='number'; rateN.step='0.01'; rateN.value='2'; rateN.style.width='80px';
+    rate.append(rateS, rateN);
+    rateS.oninput=()=>{ lfo.osc.frequency.setValueAtTime(parseFloat(rateS.value), now()); rateN.value=rateS.value; };
+    rateN.onchange=()=>{ lfo.osc.frequency.setValueAtTime(parseFloat(rateN.value), now()); rateS.value=rateN.value; };
+
+    // depth
+    const depth=document.createElement('div');
+    const dS=document.createElement('input'); dS.type='range'; dS.min='0'; dS.max='1'; dS.step='0.001'; dS.value='0';
+    const dN=document.createElement('input'); dN.type='number'; dN.step='0.001'; dN.value='0'; dN.style.width='80px';
+    depth.append(dS, dN);
+    dS.oninput=()=>{ lfo.g.gain.setValueAtTime(parseFloat(dS.value), now()); dN.value=dS.value; };
+    dN.onchange=()=>{ lfo.g.gain.setValueAtTime(parseFloat(dN.value), now()); dS.value=dN.value; };
+
+    // target (instrument + param)
+    const target=document.createElement('div');
+    const tIns=document.createElement('select');
+    const tPar=document.createElement('select');
+    instruments.forEach(ins=>{ const o=document.createElement('option'); o.value=ins.id; o.textContent=ins.label; tIns.appendChild(o); });
+    ['volume','pan'].forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; tPar.appendChild(o); });
+    function setT(){ const tr=tracks.find(x=>x.id===tIns.value); const tgt=getParamTarget(tr, tPar.value); lfo.connect(tgt); }
+    tIns.onchange=setT; tPar.onchange=setT; target.append(tIns, tPar);
+
+    row.append(lbl, rate, depth, target);
+    lfoList.appendChild(row);
+    setT();
+  };
+
+  // Построить все дорожки
+  instruments.forEach((_,i)=> makeRow(tracks[i]));
+
+  // Transport
+  document.getElementById('playBtn').onclick = start;
+  document.getElementById('stopBtn').onclick = stop;
+  document.getElementById('restartBtn').onclick = restart;
+  document.getElementById('bpm').onchange = ()=>{ /* применяется на лету */ };
+
+})();
+</script>
+</body>
+</html>
