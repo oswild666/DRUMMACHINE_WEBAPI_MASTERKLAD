@@ -100,8 +100,8 @@
         <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss-azerbaijan-riddim.html">AZERBAIJAN RIDDIM</a>
         <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss-necrofuturist.html">NECROFUTURIST</a>
         <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss premium.html">PREMIUM</a>
-        <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss ipadpro version v1.2.html">DRUMBOSS IPAD PRO</a>
-        <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/DrumBoss IpadPro version">DRUM BOSS IPAD VERSION SPECIAL</a>
+        <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss ipadpro version v1.2.html">DRUMBOSS IPAD PRO RIDDIM</a>
+        <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/DrumBoss IpadPro version.html">DRUM BOSS IPAD VERSION SPECIAL</a>
       </nav>
     </div>
   </div>
