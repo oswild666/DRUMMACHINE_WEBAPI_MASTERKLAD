@@ -75,8 +75,8 @@
   <nav>
     <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss-azerbaijan-riddim.html">AZERBAIJAN RIDDIM</a>
     <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss-necrofuturist.html">NECROFUTURIST</a>
-    <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss-premium.html">PREMIUM</a>
-    <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss-ipadpro-version-v1.2.html">iPad Pro v1.2</a>
+    <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss premium.html">PREMIUM</a>
+    <a href="https://oswild666.github.io/DRUMMACHINE_WEBAPI_MASTERKLAD/drumboss ipadpro-version-v1.2.html">iPad Pro v1.2</a>
   </nav>
 
 </body>
