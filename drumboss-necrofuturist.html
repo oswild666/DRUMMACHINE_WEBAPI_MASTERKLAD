@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DRUMBOSS - NECROFUTURIST</title>
+<style>
+  :root{
+    --bg1:#061a1f;
+    --bg2:#0b3540;
+    --aqua:#38e8d8;
+    --sea:#198a9a;
+    --foam:#a7fff4;
+    --coral:#ff6f7d;
+    --sand:#ffd7b8;
+    --ink:#0a0f12;
+    --panel:rgba(255,255,255,0.08);
+    --panel-strong:rgba(255,255,255,0.14);
+    --txt:#e9fffd;
+    --muted:#92c9c4;
+    --accent-shadow:0 0 24px rgba(56,232,216,0.25), 0 0 64px rgba(255,111,125,0.15);
+  }
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 900px at 20% 10%, var(--bg2), var(--bg1) 60%);}
+  body{
+    color:var(--txt); font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    overflow-y:auto; overflow-x:hidden;
+  }
+  .ocean{
+    position:fixed; inset:0; pointer-events:none; opacity:.25; mix-blend-mode:screen;
+    background:
+      radial-gradient(600px 400px at 80% 20%, rgba(56,232,216,.08), transparent 60%),
+      radial-gradient(700px 500px at 20% 80%, rgba(255,111,125,.08), transparent 60%);
+    filter:blur(0.5px);
+    animation: drift 28s linear infinite alternate;
+  }
+  @keyframes drift{from{transform:translateY(-2%) scale(1);} to{transform:translateY(2%) scale(1.02);} }
+
+  .wrap{max-width:1160px; margin:32px auto 120px; padding:0 16px;}
+
+  .topbar{
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    background:linear-gradient(120deg, rgba(56,232,216,.08), rgba(255,111,125,.06));
+    border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:12px 16px;
+    box-shadow: var(--accent-shadow);
+  }
+  .title{
+    margin:12px 0 18px 0; letter-spacing:.06em; font-weight:800; font-size:28px;
+    color:var(--foam); text-shadow:0 0 16px rgba(167,255,244,.35);
+  }
+  label.inline{display:flex; align-items:center; gap:8px; color:var(--foam)}
+  input[type="number"], input[type="text"], select{
+    background:var(--panel); color:var(--txt); border:1px solid rgba(255,255,255,.18);
+    border-radius:10px; padding:6px 10px; outline:none; min-width:70px;
+  }
+  input[type="number"]:focus, select:focus{border-color:var(--aqua); box-shadow:0 0 0 3px rgba(56,232,216,.18)}
+  button{
+    background:linear-gradient(180deg, var(--panel-strong), rgba(255,255,255,.06));
+    color:var(--txt); border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:8px 12px;
+    font-weight:600; letter-spacing:.02em; cursor:pointer;
+  }
+  button:hover{border-color:var(--foam); box-shadow:0 0 0 3px rgba(167,255,244,.15)}
+  button.primary{background:linear-gradient(180deg, rgba(56,232,216,.17), rgba(56,232,216,.08)); border-color:rgba(56,232,216,.35)}
+  button.warn{background:linear-gradient(180deg, rgba(255,111,125,.2), rgba(255,111,125,.08)); border-color:rgba(255,111,125,.35)}
+
+  .row{
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:10px; margin:14px 0 26px;
+    backdrop-filter: blur(6px);
+  }
+  .rowHead{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0 10px}
+  .rowHead .name{font-weight:800; color:var(--sand); text-shadow:0 0 10px rgba(255,215,184,.25)}
+  .rowHead .meta{color:var(--muted); font-size:13px}
+
+  .grid{display:grid; gap:6px; grid-template-columns: repeat(32, minmax(18px, 1fr)); align-items:end}
+  .cell, .macro{
+    height:28px; border-radius:8px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06);
+    display:flex; align-items:center; justify-content:center; font-size:12px; user-select:none;
+  }
+  .cell.off{opacity:.25; background:rgba(255,255,255,.03)}
+  .cell.on{background:linear-gradient(180deg, rgba(56,232,216,.25), rgba(56,232,216,.08)); border-color:rgba(56,232,216,.5)}
+  .cell.playhead{outline:2px solid var(--coral); box-shadow:0 0 12px rgba(255,111,125,.35) inset}
+  .macro{height:24px; padding:0}
+  .macro input{
+    width:100%; height:100%; border:none; background:transparent; color:var(--txt); text-align:center; font-size:12px;
+  }
+  .controls{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0 4px;
+  }
+  .badge{
+    padding:4px 8px; border-radius:999px; font-size:12px; background:rgba(56,232,216,.14); border:1px solid rgba(56,232,216,.35); color:var(--foam)
+  }
+  .paramPanel{
+    margin-top:10px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:rgba(12,26,32,.35);
+    display:none;
+  }
+  .paramPanel.open{display:block}
+  .paramGrid{
+    display:grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap:10px;
+  }
+  .knob{display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:8px}
+  .knob label{font-size:12px; color:var(--muted)}
+  .knob input[type="range"]{width:100%}
+  .sectionTitle{grid-column:1/-1; margin:4px 0 2px; font-weight:800; color:var(--foam); opacity:.9}
+
+  .modBar{display:flex; align-items:center; gap:10px; margin:8px 0; flex-wrap:wrap}
+  .modInfo{font-size:12px; color:var(--muted)}
+  .dropdown{background:var(--panel); border:1px solid rgba(255,255,255,.18); color:var(--txt); border-radius:10px; padding:6px 10px}
+  .tiny{font-size:12px; opacity:.8}
+
+  .footnote{margin-top:12px; color:var(--muted); font-size:12px}
+</style>
+</head>
+<body>
+<div class="ocean"></div>
+<div class="wrap">
+  <div class="topbar">
+    <label class="inline">BPM <input id="bpm" type="number" min="20" max="300" step="1" value="120"></label>
+    <button id="play" class="primary">PLAY</button>
+    <button id="stop">STOP</button>
+    <button id="restart" class="warn">RESTART ALL PATTERNS</button>
+    <span class="badge">POLYRHYTM MODULATION EQUATION</span>
+  </div>
+  <div class="title">DRUMBOSS: LUXURY RADIACTIVITY</div>
+
+  <div id="rows"></div>
+
+  <div class="footnote">
+    Под каждой нотой — макро‑ячейки (0–127). По умолчанию — Velocity. Нажми “+M”, выбери параметр — и эта линия начнёт
+    модулировать его в реальном времени. Сохранённые модуляции доступны в выпадающем списке, но на экране — только одна активная.
+  </div>
+</div>
+
+<script>
+(function(){
+  const MAX_STEPS = 32;
+  const DEFAULT_STEPS = 8;
+  const STEP_DUR_16TH = () => (60/currentBpm)/4; // 16th grid for all; polyrhythm from different pattern lengths
+  const ctxState = { ctx:null, master:null, started:false };
+  let currentBpm = 120;
+
+  // Transport & scheduler
+  let isPlaying = false;
+  let lookahead = 25; // ms
+  let scheduleAheadTime = 0.12; // seconds
+  let timerID = null;
+  let instruments = [];
+  let firstPlayDone = false;
+
+  function initAudio(){
+    if(ctxState.ctx) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.value = 0.9;
+    master.connect(ctx.destination);
+    ctxState.ctx = ctx; ctxState.master = master;
+  }
+
+  // Utility: create noise buffer
+  function createNoiseBuffer(ctx, seconds=1){
+    const rate = ctx.sampleRate;
+    const len = Math.floor(seconds*rate);
+    const buf = ctx.createBuffer(1, len, rate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<len;i++) data[i] = Math.random()*2-1;
+    return buf;
+  }
+
+  // Envelope helper
+  function applyADSR(gainNode, time, adsr, vel=1.0){
+    const {attack, decay, sustain, release} = adsr;
+    const g = gainNode.gain;
+    const peak = Math.max(0.0001, vel);
+    g.cancelScheduledValues(time);
+    g.setValueAtTime(0.0001, time);
+    g.linearRampToValueAtTime(peak, time + Math.max(0.001, attack));
+    g.linearRampToValueAtTime(Math.max(0.0001, peak*sustain), time + Math.max(0.001, attack) + Math.max(0.001, decay));
+    // Release is scheduled by caller at note off, but for one-shots we can schedule a tail:
+    const tailStart = time + Math.max(0.001, attack) + Math.max(0.001, decay) + Math.max(0.001, adsr.hold||0);
+    g.linearRampToValueAtTime(0.0001, tailStart + Math.max(0.001, release));
+  }
+
+  function semiToRatio(semi){ return Math.pow(2, semi/12); }
+  function octaveToRatio(oct){ return Math.pow(2, oct); }
+
+  // Parameter registry per instrument for modulation mapping
+  function ParamRegistry(){
+    const map = new Map(); // id -> {id,label,min,max,unit,get,set}
+    return {
+      add(def){ map.set(def.id, def); return def.id; },
+      get(id){ return map.get(id); },
+      all(){ return Array.from(map.values()); }
+    }
+  }
+
+  // Instrument base structure
+  function Instrument(name, type){
+    return {
+      id: Math.random().toString(36).slice(2),
+      name, type,
+      pattern: Array(DEFAULT_STEPS).fill(0),
+      macrosActiveId: 'velocity',
+      macroLanes: { velocity: Array(DEFAULT_STEPS).fill(100) }, // 0..127
+      macroTargets: new Map([['velocity', {id:'velocity', label:'Velocity', min:0, max:1, unit:'', isPseudo:true}]]), // visible dropdown list
+      stepLen: DEFAULT_STEPS,
+      loopMode: 'normal', // 'normal' | 'pingpong' | 'random'
+      nextStepTime: 0,
+      stepIndex: 0,
+      direction: 1,
+      ui: null,
+      params: {}, // actual param values
+      registry: ParamRegistry(),
+      trigger: null, // function(time, velocity, modValue)
+      onParamChange: null // callback to update live nodes if needed
+    }
+  }
+
+  // Build engines
+
+  // Generic 3-osc drum with FM -> filter -> RM with 3rd osc, hats add noise, etc.
+  function build3OscDrumEngine(inst, opts){
+    const ctx = ctxState.ctx;
+    const noiseBuf = createNoiseBuffer(ctx, 1.5);
+
+    // Defaults
+    inst.params = {
+      // Osc1 & Osc2 (FM block)
+      baseFreq: opts.baseFreq || 55,
+      osc1_wave: 'sine',
+      osc1_oct: 0, osc1_semi: 0,
+      osc2_wave: 'sine',
+      osc2_oct: 0, osc2_semi: 0,
+      fm_amount: 0, // Hz
+      // Filter
+      filt_type: 'lowpass', filt_cut: 12000, filt_Q: 0.7,
+      // RM with Osc3
+      osc3_wave: 'sine', osc3_oct: 0, osc3_semi: 0, ring_amount: 0.0, ring_freq: 0,
+      // ADSR for main body
+      a: 0.002, d: 0.08, s: 0.2, r: 0.15, hold: 0.0,
+      // Hats extra noise
+      noise_mix: opts.noise ? 0.6 : 0.0,
+      noise_filt_type: 'highpass', noise_cut: 8000, noise_Q: 0.7
+    };
+
+    // Registry (for modulation)
+    const R = inst.registry;
+    const add = (id,label,min,max,unit,setter) => R.add({id,label,min,max,unit,set:val=>{inst.params[id]=val; setter&&setter(val)}, get:()=>inst.params[id]});
+
+    add('baseFreq','Base Freq',20,400,'Hz');
+    add('fm_amount','FM Amount',0,1200,'Hz');
+    add('filt_cut','Filter Cutoff',50,16000,'Hz');
+    add('filt_Q','Filter Q',0.1,30,'');
+    add('ring_amount','Ring Amount',0,1,'');
+    add('ring_freq','Ring Freq',0,2000,'Hz');
+    add('a','Attack',0.0005,0.2,'s');
+    add('d','Decay',0.005,1.5,'s');
+    add('s','Sustain',0,1,'');
+    add('r','Release',0.005,2,'s');
+    if(opts.noise){
+      add('noise_mix','Noise Mix',0,1,'');
+      add('noise_cut','Noise Cut',1000,18000,'Hz');
+      add('noise_Q','Noise Q',0.1,20,'');
+    }
+
+    inst.trigger = (time, vel, modValue)=>{
+      const p = inst.params;
+
+      // Carrier (Osc2) with FM from Osc1
+      const car = ctx.createOscillator(); car.type = p.osc2_wave;
+      const carGain = ctx.createGain(); carGain.gain.value = 0.0001;
+
+      const freq2 = p.baseFreq * octaveToRatio(p.osc2_oct) * semiToRatio(p.osc2_semi);
+      car.frequency.setValueAtTime(freq2, time);
+
+      const mod = ctx.createOscillator(); mod.type = p.osc1_wave;
+      const freq1 = p.baseFreq * octaveToRatio(p.osc1_oct) * semiToRatio(p.osc1_semi);
+      mod.frequency.setValueAtTime(freq1, time);
+
+      const fmGain = ctx.createGain(); fmGain.gain.setValueAtTime(p.fm_amount, time);
+      mod.connect(fmGain).connect(car.frequency);
+
+      // Filter
+      const biq = ctx.createBiquadFilter();
+      biq.type = p.filt_type;
+      biq.frequency.setValueAtTime(p.filt_cut, time);
+      biq.Q.setValueAtTime(p.filt_Q, time);
+
+      // Ring Mod (AM) with Osc3 into Gain.gain
+      const ringGain = ctx.createGain();
+      ringGain.gain.value = 1.0; // will be modulated by ring osc scaled by ring_amount
+      const ringOsc = ctx.createOscillator(); ringOsc.type = p.osc3_wave;
+      const ringFreq = (p.ring_freq && p.ring_freq>0) ? p.ring_freq : (p.baseFreq * octaveToRatio(p.osc3_oct) * semiToRatio(p.osc3_semi));
+      ringOsc.frequency.setValueAtTime(ringFreq, time);
+      const ringAmt = ctx.createGain(); ringAmt.gain.value = p.ring_amount;
+      ringOsc.connect(ringAmt).connect(ringGain.gain);
+
+      // Noise for hats
+      let noiseGain=null, noiseNode=null, noiseFilter=null;
+      if(opts.noise && p.noise_mix>0){
+        noiseNode = ctx.createBufferSource();
+        noiseNode.buffer = noiseBuf;
+        noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = p.noise_filt_type;
+        noiseFilter.frequency.setValueAtTime(p.noise_cut, time);
+        noiseFilter.Q.setValueAtTime(p.noise_Q, time);
+        noiseGain = ctx.createGain();
+        noiseGain.gain.value = p.noise_mix * vel;
+      }
+
+      // Envelope
+      const env = {attack:p.a, decay:p.d, sustain:p.s, release:p.r, hold:p.hold||0};
+      const amp = ctx.createGain(); amp.gain.value = 0.0001;
+
+      // Connections
+      car.connect(carGain).connect(biq).connect(ringGain).connect(amp).connect(ctxState.master);
+      if(noiseGain){
+        noiseNode.connect(noiseFilter).connect(amp);
+      }
+
+      // Schedule
+      applyADSR(amp, time, env, vel);
+      applyADSR(carGain, time, {attack:env.attack, decay:env.decay, sustain:1-env.sustain, release:env.release, hold:env.hold}, 1.0);
+
+      mod.start(time); car.start(time); ringOsc.start(time);
+      if(noiseNode) noiseNode.start(time);
+
+      // Stop (one-shot tail)
+      const stopAt = time + Math.max(0.05, env.attack+env.decay+env.hold+env.release) + 0.15;
+      mod.stop(stopAt); car.stop(stopAt); ringOsc.stop(stopAt);
+      if(noiseNode) noiseNode.stop(stopAt);
+    };
+  }
+
+  // Bell: 3 FM in chain -> RM -> filter with its own ADSR
+  function buildBellEngine(inst){
+    const ctx = ctxState.ctx;
+    inst.params = {
+      baseFreq: 660,
+      o1_wave:'sine', o2_wave:'sine', o3_wave:'sine', o4_wave:'sine',
+      o1_ratio:1, o2_ratio:2, o3_ratio:3,
+      fm12: 300, fm23: 200,
+      ring_amount:0.5, ring_freq: 440,
+      a:0.002, d:1.2, s:0, r:1.4, hold:0,
+      filt_type:'bandpass', filt_cut: 3000, filt_Q: 6.0,
+      fa:0.002, fd:0.4, fs:0.0, fr:0.6
+    };
+    const R = inst.registry;
+    const add = (id,label,min,max,unit)=>R.add({id,label,min,max,unit,set:v=>inst.params[id]=v,get:()=>inst.params[id]});
+    add('baseFreq','Base Freq',110,2000,'Hz');
+    add('fm12','FM 1->2',0,2000,'Hz');
+    add('fm23','FM 2->3',0,2000,'Hz');
+    add('ring_amount','Ring Amount',0,1,'');
+    add('ring_freq','Ring Freq',0,4000,'Hz');
+    add('filt_cut','Filter Cutoff',200,8000,'Hz');
+    add('filt_Q','Filter Q',0.1,30,'');
+    add('a','Amp Attack',0.0005,0.2,'s'); add('d','Amp Decay',0.02,3,'s'); add('s','Amp Sustain',0,1,''); add('r','Amp Release',0.02,3,'s');
+    add('fa','Filt Attack',0.0005,0.5,'s'); add('fd','Filt Decay',0.01,2,'s'); add('fs','Filt Sustain',0,1,''); add('fr','Filt Release',0.02,2,'s');
+
+    inst.trigger = (time, vel)=>{
+      const p = inst.params;
+      const o1 = ctx.createOscillator(); o1.type=p.o1_wave; o1.frequency.setValueAtTime(p.baseFreq*p.o1_ratio, time);
+      const o2 = ctx.createOscillator(); o2.type=p.o2_wave; o2.frequency.setValueAtTime(p.baseFreq*p.o2_ratio, time);
+      const o3 = ctx.createOscillator(); o3.type=p.o3_wave; o3.frequency.setValueAtTime(p.baseFreq*p.o3_ratio, time);
+      const fm12gain = ctx.createGain(); fm12gain.gain.value = p.fm12;
+      const fm23gain = ctx.createGain(); fm23gain.gain.value = p.fm23;
+      o1.connect(fm12gain).connect(o2.frequency);
+      o2.connect(fm23gain).connect(o3.frequency);
+
+      const carGain = ctx.createGain(); carGain.gain.value = 0.0001;
+
+      const ringOsc = ctx.createOscillator(); ringOsc.type=p.o4_wave; ringOsc.frequency.setValueAtTime(p.ring_freq, time);
+      const ringGain = ctx.createGain(); ringGain.gain.value = 1.0;
+      const ringAmt = ctx.createGain(); ringAmt.gain.value = p.ring_amount;
+      ringOsc.connect(ringAmt).connect(ringGain.gain);
+
+      const biq = ctx.createBiquadFilter(); biq.type=p.filt_type;
+      const filtEnvGain = ctx.createGain();
+      biq.frequency.setValueAtTime(p.filt_cut, time);
+      biq.Q.setValueAtTime(p.filt_Q, time);
+
+      const amp = ctx.createGain(); amp.gain.value = 0.0001;
+
+      // Connections
+      o3.connect(carGain).connect(biq).connect(ringGain).connect(amp).connect(ctxState.master);
+
+      // Envelopes
+      applyADSR(amp, time, {attack:p.a,decay:p.d,sustain:p.s,release:p.r}, vel);
+
+      // Filter frequency envelope: scale around base cutoff
+      // We'll modulate frequency by multiplying via setTarget-style ramps using an auxiliary gain to AudioParam
+      const env = {attack:p.fa,decay:p.fd,sustain:p.fs,release:p.fr,hold:0};
+      const start = p.filt_cut;
+      const peak = p.filt_cut*1.8;
+      const endS = p.filt_cut*(0.6 + 0.4*env.sustain);
+      const fp = biq.frequency;
+      fp.cancelScheduledValues(time);
+      fp.setValueAtTime(start, time);
+      fp.linearRampToValueAtTime(peak, time+env.attack);
+      fp.linearRampToValueAtTime(endS, time+env.attack+env.decay);
+      fp.linearRampToValueAtTime(start*0.7, time+env.attack+env.decay+env.release);
+
+      // Start/stop
+      o1.start(time); o2.start(time); o3.start(time); ringOsc.start(time);
+      const stopAt = time + Math.max(0.2, p.d+p.r) + 0.3;
+      o1.stop(stopAt); o2.stop(stopAt); o3.stop(stopAt); ringOsc.stop(stopAt);
+    };
+  }
+
+  // Snare: 2 noise (HP & BP) + 2 triangles RM -> filter
+  function buildSnareEngine(inst){
+    const ctx = ctxState.ctx;
+    const noiseBuf = createNoiseBuffer(ctx, 1.5);
+    inst.params = {
+      // Noise
+      n1_cut: 2500, n1_Q: 0.8, // hipass
+      n2_cut: 3000, n2_Q: 2.0, // bandpass
+      noise_mix: 0.8,
+      // Triangles RM
+      tri1_freq: 170, tri2_freq: 330, rm_amount: 0.8,
+      // Post filter
+      filt_type:'bandpass', filt_cut: 2200, filt_Q: 1.2,
+      // ADSR
+      a:0.001, d:0.2, s:0, r:0.2
+    }
+    const R = inst.registry;
+    const add = (id,label,min,max,unit)=>R.add({id,label,min,max,unit,set:v=>inst.params[id]=v,get:()=>inst.params[id]});
+    add('n1_cut','Noise HP',500,8000,'Hz'); add('n1_Q','Noise HP Q',0.1,12,'');
+    add('n2_cut','Noise BP',500,8000,'Hz'); add('n2_Q','Noise BP Q',0.1,12,'');
+    add('noise_mix','Noise Mix',0,1,'');
+    add('tri1_freq','Tri 1 Freq',60,800,'Hz'); add('tri2_freq','Tri 2 Freq',60,1200,'Hz');
+    add('rm_amount','RM Amount',0,1,'');
+    add('filt_cut','Filter Cutoff',300,8000,'Hz'); add('filt_Q','Filter Q',0.1,20,'');
+    add('a','Attack',0.0005,0.2,'s'); add('d','Decay',0.01,1.2,'s'); add('r','Release',0.01,1.2,'s');
+
+    inst.trigger = (time, vel)=>{
+      const p = inst.params;
+      const amp = ctx.createGain(); amp.gain.value = 0.0001;
+
+      // Noise paths
+      const n1 = ctx.createBufferSource(); n1.buffer = noiseBuf;
+      const n1f = ctx.createBiquadFilter(); n1f.type='highpass'; n1f.frequency.setValueAtTime(p.n1_cut, time); n1f.Q.setValueAtTime(p.n1_Q, time);
+      const n2 = ctx.createBufferSource(); n2.buffer = noiseBuf;
+      const n2f = ctx.createBiquadFilter(); n2f.type='bandpass'; n2f.frequency.setValueAtTime(p.n2_cut, time); n2f.Q.setValueAtTime(p.n2_Q, time);
+      const nMix = ctx.createGain(); nMix.gain.value = p.noise_mix * vel;
+
+      // Triangles RM
+      const t1 = ctx.createOscillator(); t1.type='triangle'; t1.frequency.setValueAtTime(p.tri1_freq, time);
+      const t2 = ctx.createOscillator(); t2.type='triangle'; t2.frequency.setValueAtTime(p.tri2_freq, time);
+      const ringGain = ctx.createGain(); ringGain.gain.value = 1.0;
+      const ringAmt = ctx.createGain(); ringAmt.gain.value = p.rm_amount;
+      t2.connect(ringAmt).connect(ringGain.gain);
+
+      // Post filter
+      const biq = ctx.createBiquadFilter(); biq.type=p.filt_type; biq.frequency.setValueAtTime(p.filt_cut, time); biq.Q.setValueAtTime(p.filt_Q, time);
+
+      // Wire
+      n1.connect(n1f).connect(nMix);
+      n2.connect(n2f).connect(nMix);
+      const tGain = ctx.createGain(); tGain.gain.value = 0.7*vel;
+      t1.connect(tGain).connect(biq).connect(ringGain).connect(amp).connect(ctxState.master);
+      nMix.connect(amp);
+
+      // Env
+      applyADSR(amp, time, {attack:p.a,decay:p.d,sustain:0,release:p.r}, vel);
+
+      // Start/Stop
+      const stopAt = time + Math.max(0.1, p.d+p.r) + 0.2;
+      n1.start(time); n2.start(time); t1.start(time); t2.start(time);
+      n1.stop(stopAt); n2.stop(stopAt); t1.stop(stopAt); t2.stop(stopAt);
+    }
+  }
+
+  // UI builders
+  function createInstrumentRow(inst){
+    const rows = document.getElementById('rows');
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.dataset.id = inst.id;
+
+    const head = document.createElement('div');
+    head.className = 'rowHead';
+    head.innerHTML = `
+      <span class="name">${inst.name}</span>
+      <span class="meta tiny">Тип: ${inst.type}</span>
+      <div class="controls">
+        <label class="inline tiny">Steps <input class="steps" type="number" min="1" max="${MAX_STEPS}" value="${inst.stepLen}"></label>
+        <label class="inline tiny">Loop
+          <select class="loop">
+            <option value="normal">Normal</option>
+            <option value="pingpong">Ping-Pong</option>
+            <option value="random">Random</option>
+          </select>
+        </label>
+        <button class="paramBtn">PARAM</button>
+        <button class="modBtn">+M</button>
+        <span class="modInfo">Модуляция: <b class="modTarget">Velocity</b></span>
+        <select class="modList dropdown" style="display:none"></select>
+      </div>
+    `;
+    row.appendChild(head);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    // Cells + macros (two rows grid: we’ll build 32 columns, visually use stepLen)
+    inst._cellElems = [];
+    inst._macroInputs = [];
+    for(let i=0;i<MAX_STEPS;i++){
+      const cell = document.createElement('div');
+      cell.className = 'cell off';
+      cell.title = `Step ${i+1}`;
+      cell.addEventListener('click', ()=>{
+        if(i>=inst.stepLen) return;
+        inst.pattern[i] = inst.pattern[i] ? 0 : 1;
+        renderStep(inst, i);
+      });
+      inst._cellElems.push(cell);
+      grid.appendChild(cell);
+    }
+    for(let i=0;i<MAX_STEPS;i++){
+      const macro = document.createElement('div'); macro.className='macro';
+      const input = document.createElement('input'); input.type='number'; input.min=0; input.max=127; input.value = inst.macroLanes[inst.macrosActiveId][i] || 0;
+      input.addEventListener('change', ()=>{
+        const v = Math.max(0, Math.min(127, parseInt(input.value||'0',10)));
+        ensureMacroLength(inst, inst.macrosActiveId, inst.stepLen);
+        inst.macroLanes[inst.macrosActiveId][i] = v;
+        input.value = v;
+      });
+      macro.appendChild(input);
+      inst._macroInputs.push(input);
+      grid.appendChild(macro);
+    }
+    row.appendChild(grid);
+
+    const panel = document.createElement('div');
+    panel.className = 'paramPanel';
+    panel.appendChild(buildParamGrid(inst));
+    row.appendChild(panel);
+
+    // Wire controls
+    const stepsInput = head.querySelector('.steps');
+    const loopSelect = head.querySelector('.loop');
+    const paramBtn = head.querySelector('.paramBtn');
+    const modBtn = head.querySelector('.modBtn');
+    const modTargetLabel = head.querySelector('.modTarget');
+    const modList = head.querySelector('.modList');
+
+    stepsInput.addEventListener('change', ()=>{
+      const n = Math.max(1, Math.min(MAX_STEPS, parseInt(stepsInput.value||DEFAULT_STEPS,10)));
+      inst.stepLen = n;
+      // ensure arrays
+      inst.pattern.length = n; for(let i=0;i<n;i++){ if(inst.pattern[i]===undefined) inst.pattern[i]=0; }
+      Object.keys(inst.macroLanes).forEach(id=>ensureMacroLength(inst, id, n));
+      renderPattern(inst);
+    });
+    loopSelect.addEventListener('change', ()=>{ inst.loopMode = loopSelect.value; });
+
+    paramBtn.addEventListener('click', ()=>{
+      panel.classList.toggle('open');
+    });
+
+    modBtn.addEventListener('click', ()=>{
+      // open quick choose for parameter
+      const menu = document.createElement('select'); menu.className='dropdown';
+      const opts = inst.registry.all();
+      if(opts.length===0){ alert('Нет параметров для модуляции'); return; }
+      menu.innerHTML = `<option value="">— выбери параметр —</option>` +
+        opts.map(p=>`<option value="${p.id}">${p.label}</option>`).join('');
+      menu.addEventListener('change', ()=>{
+        const id = menu.value; if(!id) return;
+        if(!inst.macroTargets.has(id)){
+          const def = inst.registry.get(id);
+          inst.macroTargets.set(id, {id: def.id, label:def.label, min:def.min, max:def.max, unit:def.unit});
+        }
+        inst.macrosActiveId = id;
+        if(!inst.macroLanes[id]) inst.macroLanes[id] = Array(inst.stepLen).fill(64);
+        modTargetLabel.textContent = inst.registry.get(id).label;
+        updateMacroInputs(inst);
+        updateModDropdown(inst, modList, modTargetLabel);
+        menu.remove();
+      });
+      modBtn.insertAdjacentElement('afterend', menu);
+      menu.focus();
+    });
+
+    modList.addEventListener('change', ()=>{
+      const id = modList.value;
+      inst.macrosActiveId = id;
+      modTargetLabel.textContent = id==='velocity' ? 'Velocity' : (inst.registry.get(id)?.label || id);
+      updateMacroInputs(inst);
+    });
+
+    rows.appendChild(row);
+    inst.ui = { row, head, grid, panel, stepsInput, loopSelect, modTargetLabel, modList };
+    renderPattern(inst);
+    updateModDropdown(inst, modList, modTargetLabel);
+  }
+
+  function ensureMacroLength(inst, id, len){
+    const arr = inst.macroLanes[id] || [];
+    if(arr.length < len){ while(arr.length<len) arr.push( id==='velocity'?100:64 ); }
+    else if(arr.length > len){ arr.length = len; }
+    inst.macroLanes[id] = arr;
+  }
+
+  function updateMacroInputs(inst){
+    ensureMacroLength(inst, inst.macrosActiveId, inst.stepLen);
+    for(let i=0;i<MAX_STEPS;i++){
+      const val = (i<inst.stepLen) ? (inst.macroLanes[inst.macrosActiveId][i]||0) : 0;
+      inst._macroInputs[i].value = val;
+      inst._macroInputs[i].disabled = i>=inst.stepLen;
+      inst._macroInputs[i].parentElement.style.opacity = i>=inst.stepLen ? .25 : 1;
+    }
+  }
+
+  function renderStep(inst, i){
+    const cell = inst._cellElems[i];
+    const active = inst.pattern[i] ? true : false;
+    cell.className = 'cell ' + (active ? 'on' : 'off') + (cell.classList.contains('playhead')?' playhead':'');
+    cell.style.opacity = i>=inst.stepLen ? .15 : 1;
+    cell.style.pointerEvents = i>=inst.stepLen ? 'none' : 'auto';
+  }
+  function renderPattern(inst){
+    for(let i=0;i<MAX_STEPS;i++){
+      renderStep(inst, i);
+    }
+    updateMacroInputs(inst);
+  }
+  function updatePlayhead(inst, idx){
+    for(let i=0;i<MAX_STEPS;i++){
+      const c = inst._cellElems[i];
+      c.classList.remove('playhead');
+      if(i===idx) c.classList.add('playhead');
+    }
+  }
+
+  function updateModDropdown(inst, modList, labelEl){
+    // Populate dropdown when first modulation appears
+    const entries = Array.from(inst.macroTargets.values());
+    if(entries.length>0){
+      modList.style.display = 'inline-block';
+      modList.innerHTML = entries.map(e=>`<option value="${e.id}">${e.id==='velocity'?'Velocity':e.label}</option>`).join('');
+      modList.value = inst.macrosActiveId;
+      labelEl.textContent = inst.macrosActiveId==='velocity' ? 'Velocity' : (inst.registry.get(inst.macrosActiveId)?.label || inst.macrosActiveId);
+    }else{
+      modList.style.display = 'none';
+    }
+  }
+
+  // Map macro value (0..127) to parameter range
+  function mapMacro(val, min, max){
+    const t = Math.max(0, Math.min(1, val/127));
+    return min + (max-min)*t;
+  }
+
+  function schedule(){
+    const ctx = ctxState.ctx;
+    while(isPlaying && instruments.length){
+      const now = ctx.currentTime;
+      let nextEventTime = Infinity;
+
+      for(const inst of instruments){
+        const stepDur = STEP_DUR_16TH();
+        if(inst.nextStepTime === 0) inst.nextStepTime = now + 0.05;
+        while(inst.nextStepTime < now + scheduleAheadTime){
+          // Determine current step index
+          let idx = inst.stepIndex % inst.stepLen;
+          if(inst.loopMode==='random'){
+            idx = Math.floor(Math.random()*inst.stepLen);
+          }
+          // Play if triggered
+          const trig = inst.pattern[idx] ? 1 : 0;
+          const modId = inst.macrosActiveId;
+          ensureMacroLength(inst, modId, inst.stepLen);
+          const macroVal = inst.macroLanes[modId][idx] || 0;
+          // Velocity
+          const velocity = Math.max(0.05, Math.min(1, (inst.macroLanes['velocity']?.[idx] ?? 100)/127));
+          if(trig){
+            // If macro controls a real param, set it right before trigger
+            if(modId && modId!=='velocity' && inst.registry.get(modId)){
+              const def = inst.registry.get(modId);
+              const mapped = mapMacro(macroVal, def.min, def.max);
+              def.set(mapped);
+            }
+            // Trigger
+            inst.trigger(inst.nextStepTime, velocity, macroVal);
+          }
+          // Visual playhead
+          updatePlayhead(inst, idx);
+
+          // Advance step index based on mode
+          if(inst.loopMode==='normal'){
+            inst.stepIndex = (inst.stepIndex + 1) % inst.stepLen;
+          }else if(inst.loopMode==='pingpong'){
+            if(inst.direction>0 && inst.stepIndex>=inst.stepLen-1){ inst.direction = -1; }
+            else if(inst.direction<0 && inst.stepIndex<=0){ inst.direction = 1; }
+            inst.stepIndex += inst.direction;
+          }else if(inst.loopMode==='random'){
+            // keep stepIndex moving forward for consistent time, but index selection is random
+            inst.stepIndex = (inst.stepIndex + 1) % inst.stepLen;
+          }
+
+          inst.nextStepTime += stepDur;
+        }
+        nextEventTime = Math.min(nextEventTime, inst.nextStepTime);
+      }
+      break;
+    }
+  }
+
+  function schedulerLoop(){
+    if(!isPlaying) return;
+    schedule();
+    timerID = setTimeout(schedulerLoop, lookahead);
+  }
+
+  function start(){
+    initAudio();
+    const ctx = ctxState.ctx;
+    if(ctx.state === 'suspended') ctx.resume();
+    if(!firstPlayDone){
+      const now = ctx.currentTime + 0.1;
+      instruments.forEach(inst=>{
+        inst.nextStepTime = now;
+        inst.stepIndex = 0;
+        inst.direction = 1;
+      });
+      firstPlayDone = true;
+    }
+    isPlaying = true;
+    schedulerLoop();
+  }
+  function stop(){
+    isPlaying = false;
+    if(timerID) clearTimeout(timerID);
+    instruments.forEach(inst=>updatePlayhead(inst, -1));
+  }
+  function restartAll(){
+    const ctx = ctxState.ctx;
+    const now = ctx.currentTime + 0.12;
+    instruments.forEach(inst=>{
+      inst.nextStepTime = now;
+      inst.stepIndex = 0;
+      inst.direction = 1;
+      updatePlayhead(inst, -1);
+    });
+  }
+
+  // Build all instruments
+	function addInstruments(){
+	initAudio(); // Обязательно перед генерацией noise
+	const list = [
+      {name:'Kick A', type:'3OSC FM->FILT->RM', build:(inst)=>build3OscDrumEngine(inst,{baseFreq:55})},
+      {name:'Kick B', type:'3OSC FM->FILT->RM', build:(inst)=>build3OscDrumEngine(inst,{baseFreq:48})},
+      {name:'Hat Closed', type:'3OSC + NOISE', build:(inst)=>build3OscDrumEngine(inst,{baseFreq:4000, noise:true})},
+      {name:'Hat Open', type:'3OSC + NOISE', build:(inst)=>build3OscDrumEngine(inst,{baseFreq:2200, noise:true})},
+      {name:'Bell', type:'3xFM + RM + Filter ADSR', build:buildBellEngine},
+      {name:'Snare', type:'2xNoise + 2xTri RM -> Filter', build:buildSnareEngine}
+    ];
+    for(const meta of list){
+      const inst = Instrument(meta.name, meta.type);
+      instruments.push(inst);
+      meta.build(inst);
+      createInstrumentRow(inst);
+    }
+  }
+
+  // Build parameter UI
+  function buildParamGrid(inst){
+    const wrap = document.createElement('div'); wrap.className='paramGrid';
+
+    // Section groups differ by type; we’ll build a generic set based on registry and some selects.
+    const sections = [];
+
+    // Type-specific UI
+    if(inst.name.startsWith('Kick') || inst.name.startsWith('Hat')){
+      sections.push({title:'Oscillators & FM', items:[
+        selectEnum('Osc1 Wave','osc1_wave',['sine','triangle','sawtooth','square']),
+        selectEnum('Osc2 Wave','osc2_wave',['sine','triangle','sawtooth','square']),
+        slider('Osc1 Oct','osc1_oct',-2,2,1),
+        slider('Osc2 Oct','osc2_oct',-2,2,1),
+        slider('Osc1 Semi','osc1_semi',-12,12,1),
+        slider('Osc2 Semi','osc2_semi',-12,12,1),
+        sliderReg('FM Amount','fm_amount','Hz', inst.registry.get('fm_amount')),
+      ]});
+      sections.push({title:'Filter', items:[
+        selectEnum('Type','filt_type',['lowpass','highpass','bandpass','notch','peaking','allpass']),
+        sliderReg('Cutoff','filt_cut','Hz', inst.registry.get('filt_cut')),
+        sliderReg('Q','filt_Q','', inst.registry.get('filt_Q')),
+      ]});
+      sections.push({title:'Ring Mod', items:[
+        selectEnum('Osc3 Wave','osc3_wave',['sine','triangle','sawtooth','square']),
+        slider('Osc3 Oct','osc3_oct',-2,2,1),
+        slider('Osc3 Semi','osc3_semi',-12,12,1),
+        sliderReg('Amount','ring_amount','', inst.registry.get('ring_amount')),
+        sliderReg('Frequency','ring_freq','Hz', inst.registry.get('ring_freq')),
+      ]});
+      if(inst.name.startsWith('Hat')){
+        sections.push({title:'Noise', items:[
+          selectEnum('Noise Filt','noise_filt_type',['highpass','bandpass','notch']),
+          sliderReg('Noise Cut','noise_cut','Hz', inst.registry.get('noise_cut')),
+          sliderReg('Noise Q','noise_Q','', inst.registry.get('noise_Q')),
+          sliderReg('Noise Mix','noise_mix','', inst.registry.get('noise_mix')),
+        ]});
+      }
+      sections.push({title:'Amp Envelope', items:[
+        sliderReg('Attack','a','s', inst.registry.get('a')),
+        sliderReg('Decay','d','s', inst.registry.get('d')),
+        sliderReg('Sustain','s','', inst.registry.get('s')),
+        sliderReg('Release','r','s', inst.registry.get('r')),
+      ]});
+      sections.push({title:'Pitch', items:[
+        sliderReg('Base Freq','baseFreq','Hz', inst.registry.get('baseFreq'))
+      ]});
+    }
+    else if(inst.name==='Bell'){
+      sections.push({title:'FM Chain', items:[
+        sliderReg('Base Freq','baseFreq','Hz', inst.registry.get('baseFreq')),
+        sliderReg('FM 1→2','fm12','Hz', inst.registry.get('fm12')),
+        sliderReg('FM 2→3','fm23','Hz', inst.registry.get('fm23')),
+        sliderReg('Ring Amount','ring_amount','', inst.registry.get('ring_amount')),
+        sliderReg('Ring Freq','ring_freq','Hz', inst.registry.get('ring_freq')),
+      ]});
+      sections.push({title:'Filter', items:[
+               selectEnum('Type','filt_type',['lowpass','highpass','bandpass','notch','peaking']),
+        sliderReg('Cutoff','filt_cut','Hz', inst.registry.get('filt_cut')),
+        sliderReg('Q','filt_Q','', inst.registry.get('filt_Q')),
+        sliderReg('Attack','fa','s', inst.registry.get('fa')),
+        sliderReg('Decay','fd','s', inst.registry.get('fd')),
+        sliderReg('Sustain','fs','', inst.registry.get('fs')),
+        sliderReg('Release','fr','s', inst.registry.get('fr'))
+      ]});
+    }
+    else if(inst.name==='Snare'){
+      sections.push({title:'Noise Filters', items:[
+        sliderReg('HP Cut','n1_cut','Hz', inst.registry.get('n1_cut')),
+        sliderReg('HP Q','n1_Q','', inst.registry.get('n1_Q')),
+        sliderReg('BP Cut','n2_cut','Hz', inst.registry.get('n2_cut')),
+        sliderReg('BP Q','n2_Q','', inst.registry.get('n2_Q')),
+        sliderReg('Noise Mix','noise_mix','', inst.registry.get('noise_mix')),
+      ]});
+      sections.push({title:'Triangle RM', items:[
+        sliderReg('Triangle 1','tri1_freq','Hz', inst.registry.get('tri1_freq')),
+        sliderReg('Triangle 2','tri2_freq','Hz', inst.registry.get('tri2_freq')),
+        sliderReg('Ring Amount','rm_amount','', inst.registry.get('rm_amount')),
+      ]});
+      sections.push({title:'Filter', items:[
+        selectEnum('Type','filt_type',['lowpass','highpass','bandpass','notch','peaking']),
+        sliderReg('Cutoff','filt_cut','Hz', inst.registry.get('filt_cut')),
+        sliderReg('Q','filt_Q','', inst.registry.get('filt_Q')),
+      ]});
+      sections.push({title:'Envelope', items:[
+        sliderReg('Attack','a','s', inst.registry.get('a')),
+        sliderReg('Decay','d','s', inst.registry.get('d')),
+        sliderReg('Release','r','s', inst.registry.get('r')),
+      ]});
+    }
+
+    for(const section of sections){
+      const head = document.createElement('div');
+      head.className = 'sectionTitle';
+      head.textContent = section.title;
+      wrap.appendChild(head);
+      for(const el of section.items){ wrap.appendChild(el); }
+    }
+    return wrap;
+
+    // Helpers
+    function slider(label, param, min, max, step=1){
+      const div = document.createElement('div'); div.className='knob';
+      const lbl = document.createElement('label'); lbl.textContent = label;
+      const slider = document.createElement('input'); slider.type='range';
+      slider.min=min; slider.max=max; slider.step=step;
+      slider.value = inst.params[param];
+      slider.addEventListener('input', ()=>{ inst.params[param] = parseFloat(slider.value); });
+      div.appendChild(lbl); div.appendChild(slider);
+      return div;
+    }
+
+    function sliderReg(label, param, unit, def){
+      const div = document.createElement('div'); div.className='knob';
+      const lbl = document.createElement('label'); lbl.textContent = label + (unit?' ('+unit+')':'');
+      const slider = document.createElement('input'); slider.type='range';
+      slider.min=def.min; slider.max=def.max;
+      slider.step=((def.max-def.min)>1)?((def.max-def.min)/200).toFixed(3):0.01;
+      slider.value = def.get();
+      slider.addEventListener('input', ()=>{ def.set(parseFloat(slider.value)); });
+      div.appendChild(lbl); div.appendChild(slider);
+      return div;
+    }
+
+    function selectEnum(label, param, choices){
+      const div = document.createElement('div'); div.className='knob';
+      const lbl = document.createElement('label'); lbl.textContent = label;
+      const sel = document.createElement('select');
+      for(const ch of choices){
+        const opt = document.createElement('option'); opt.value=ch; opt.textContent=ch;
+        if(inst.params[param]===ch) opt.selected=true;
+        sel.appendChild(opt);
+      }
+      sel.addEventListener('change', ()=>{ inst.params[param]=sel.value; });
+      div.appendChild(lbl); div.appendChild(sel);
+      return div;
+    }
+  }
+
+  // Run
+  addInstruments();
+
+  document.getElementById('play').addEventListener('click', start);
+  document.getElementById('stop').addEventListener('click', stop);
+  document.getElementById('restart').addEventListener('click', restartAll);
+})();
+</script>
+</body>
+</html>
